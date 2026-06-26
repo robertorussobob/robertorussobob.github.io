@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>PALEOTRON essays</title>
+  <subtitle>A playground of code, simulations and essays. Things I build for the joy of it.</subtitle>
+  <link href="https://paleotron.org/feed.xml" rel="self"/>
+  <link href="https://paleotron.org/essays/"/>
+  <id>https://paleotron.org/essays/</id>
+  <updated>2020-03-01T00:00:00Z</updated>
+  <author><name>Roberto Russo</name></author>
+  <entry>
+    <title>Risorse per lo sviluppatore professionale</title>
+    <link href="https://paleotron.org/essays/risorse-sviluppatore-professionale.html"/>
+    <id>https://paleotron.org/essays/risorse-sviluppatore-professionale.html</id>
+    <updated>2020-03-01T00:00:00Z</updated>
+    <summary>Una lista essenziale e deliberatamente breve di risorse pratiche per la produttività dello sviluppatore di software. Niente linguaggi, niente prodotti: contano le persone.</summary>
+  </entry>
+</feed>

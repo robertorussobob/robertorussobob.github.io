@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0e14">
+<title>PALEOTRON</title>
+<meta name="description" content="Roberto Russo: personal playground and essays.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paleotron">
+<meta property="og:title" content="PALEOTRON">
+<meta property="og:description" content="Roberto Russo: personal playground and essays.">
+<meta property="og:url" content="https://paleotron.org/">
+<meta property="og:image" content="https://paleotron.org/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PALEOTRON">
+<meta name="twitter:description" content="Roberto Russo: personal playground and essays.">
+<meta name="twitter:image" content="https://paleotron.org/assets/img/og.png">
+<link rel="canonical" href="https://paleotron.org/">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/atom+xml" title="PALEOTRON essays" href="https://paleotron.org/feed.xml">
+<link rel="stylesheet" href="/assets/css/site.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://paleotron.org/#website", "url": "https://paleotron.org/", "name": "PALEOTRON", "description": "A playground of code, simulations and essays. Things I build for the joy of it.", "inLanguage": "en", "author": {"@id": "https://paleotron.org/#person"}}, {"@type": "Person", "@id": "https://paleotron.org/#person", "name": "Roberto Russo", "url": "https://paleotron.org/", "jobTitle": "Principal software architect", "sameAs": ["https://github.com/robertorussobob", "https://www.linkedin.com/in/robertorussobob", "https://stackoverflow.com/users/49716", "https://www.pinterest.com/robertorussobob/"]}]}</script>
+</head>
+<body data-hero="1">
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="/"><span class="brand-mark">PALEOTRON</span><span class="brand-sub">Playground</span></a>
+  <nav class="nav" aria-label="Primary">
+      <a class="active" href="/">Home</a>
+      <a href="/bio.html">Bio</a>
+      <a href="/playground/">Playground</a>
+      <a href="/essays/">Essays</a>
+      <a href="/photos.html">Photos</a>
+      <a href="/links.html">Links</a>
+  </nav>
+</header>
+<main id="main">
+<section class="hero">
+  <canvas id="vector-hero" aria-hidden="true"></canvas>
+  <div class="hero-copy">
+    <p class="eyebrow">est. Commodore 128</p>
+    <h1 class="hero-title">Software construction<br>is the activity that brings me joy.</h1>
+    <p class="hero-lede">Roberto Russo. Principal software architect. Newtonian physics,
+    object-oriented design, cloud-native platforms, and a playground of things
+    that move on a screen.</p>
+    <div class="hero-cta">
+      <a class="btn" href="/playground/">Enter the playground</a>
+      <a class="btn btn-ghost" href="/essays/">Read the essays</a>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-head"><h2>Playground</h2><a class="more" href="/playground/">all artifacts &rarr;</a></div>
+  <div class="grid">
+    <article class="card">
+  <div class="card-head"><a class="card-title" href="/artifacts/deterrenza-nucleare/index.html">WOPR: Nuclear Deterrence Simulator <span class="arrow">→</span></a><span class="badge badge-live">live</span></div>
+  <div class="card-body"><p>A self-contained interactive simulator of nuclear deterrence dynamics, in the
+spirit of WarGames&rsquo; WOPR. Game theory, escalation, thresholds. Runs entirely in
+the browser, no dependencies.</p></div>
+  <div class="card-meta">2026 &middot; simulation, game-theory, self-contained</div>
+</article><article class="card">
+  <div class="card-head"><span class="card-title">Asteroids Z</span><span class="badge badge-wip">wip</span></div>
+  <div class="card-body"><p><strong>Asteroids Z</strong> is an upcoming multiplayer <em>Asteroids</em> with retro-enhanced
+vector graphics and many ships to choose from, each with different
+physics-based trade-offs. Heavy starship with big guns vs swift <em>Cobra MK2</em>:
+who will win?</p>
+<h2 id="technical-preview">Technical preview</h2>
+<p>The game is in its <em>early development</em> stage. A <strong>technical preview</strong> is
+available. Stay tuned for upcoming updates!</p>
+<p><img alt="Screenshot (macOS)" src="/assets/img/asteroids-z/screenshot-macos.jpeg"></p>
+<h2 id="android-technical-preview">Android technical preview</h2>
+<p>Download the Android preview: <a href="/assets/downloads/asteroids-z/asteroids-z.apk">asteroids-z.apk</a></p>
+<p>To install an apk from sources other than the Play Store you may need to
+temporarily disable Google Play Protect: open the Play Store app, tap the Menu
+button, select &ldquo;Play Protect&rdquo;, and disable &ldquo;Scan device for security threats&rdquo;.</p>
+<h2 id="background">Background</h2>
+<p>Lately, after a long break from side projects, I started developing a
+full-featured <em>multiplayer</em>, real-<em>physics</em>-based, 2D space combat simulator:
+Asteroids-Z. After more than a decade of prevailing professional <em>C++</em>
+programming, how did I make it? In <em>Java</em>, of course. Maybe to show myself
+that it is possible to write good-performance software in Java, as well as
+crap-performance software in C++ (too many people think C++ alone is a
+performance <em>panacea</em>).</p>
+<h2 id="development">Development</h2>
+<p>The game is written mostly in <em>Java</em> and runs on <em>Android, iOS, WebGL</em>
+(browser), <em>macOS</em>, <em>Windows</em> and <em>Linux</em>.</p>
+<p>The server is written in <em>Java</em> and is designed making use of <strong>fast-paced</strong>
+multiplayer techniques such as <strong>client-side prediction</strong>, <strong>authoritative
+server reconciliation</strong>, <strong>entity interpolation</strong> and <strong>lag compensation</strong>. It
+runs on the <strong>Amazon AWS GameLift</strong> infrastructure for ease of
+scale-on-demand.</p>
+<p>The development workflow is fully automated thanks to <strong>GitLab</strong>: SCM, CI/CD,
+unit testing, code coverage, issue tracking, releases.</p></div>
+  <div class="card-meta">2019 &middot; game, multiplayer, vector, physics, java</div>
+</article><article class="card">
+  <div class="card-head"><span class="card-title">3D Casino Demo</span><span class="badge badge-archived">archived</span></div>
+  <div class="card-body"><p>Proof-of-concept demo of a <em>3D Casino/Poker</em>. Targeting, from the same
+application codebase, the following platforms: <strong>iOS, Android, WebGL</strong>
+(browser), <strong>macOS, Windows, Linux</strong>.</p>
+<p>Don&rsquo;t mind the performance and glitches; it was put together neglecting those
+aspects. It was a <em>proof-of-concept</em>, nothing more.</p>
+<p>The paintings in the casino portray my best work colleagues.</p>
+<p>Main tools used: C#, .Net, Unity.</p>
+<p><a href="https://youtu.be/fm4ncyo-ocw">Watch the demo on YouTube</a></p></div>
+  <div class="card-meta">2019 &middot; 3d, demo, unity, graphics</div>
+</article><article class="card">
+  <div class="card-head"><span class="card-title">Dirt Rally</span><span class="badge badge-archived">archived</span></div>
+  <div class="card-body"><p>I would love to have more time to learn to drive. This is after a weekend
+trying to learn hard RWD:</p>
+<p><a href="https://www.youtube.com/watch?v=oaLPa9R4RVw">Acropolis Rally stage, Alpine A110 1600</a></p>
+<p>Below, practicing <em>left foot braking</em>, a technique used since the sixties as a
+<em>dynamic brake bias</em> between the front and rear axes, on FWD (and even 4WD). It
+allows you to modulate the &lsquo;rotation&rsquo; of the car while cornering:</p>
+<p><a href="https://www.youtube.com/watch?v=SQPCIx_ah8s">Rallye Monte-Carlo, Peugeot 205 GTI 1.9</a></p></div>
+  <div class="card-meta">2019 &middot; sim-racing, simulation, physics, driving</div>
+</article>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-head"><h2>Essays</h2><a class="more" href="/essays/">all writing &rarr;</a></div>
+  <div class="essay-list">
+    <article class="essay-row">
+  <a class="essay-link" href="/essays/risorse-sviluppatore-professionale.html">Risorse per lo sviluppatore professionale <span class="arrow">→</span></a>
+  <div class="essay-meta"><span class="tag">Craft</span><span class="date">2020-03-01</span><span class="lang" title="written in this language">IT</span></div>
+  <p class="essay-sum">Una lista essenziale e deliberatamente breve di risorse pratiche per la produttività dello sviluppatore di software. Niente linguaggi, niente prodotti: contano le persone.</p>
+</article>
+  </div>
+</section>
+
+<script src="/assets/js/hero.js" defer></script>
+</main>
+<footer class="foot">
+  <div class="foot-name">paleotron.org</div>
+  <div class="foot-links"><a href="https://github.com/robertorussobob">GitHub</a> &middot; <a href="https://www.linkedin.com/in/robertorussobob">LinkedIn</a> &middot; <a href="https://stackoverflow.com/users/49716">Stack Overflow</a> &middot; <a href="https://www.pinterest.com/robertorussobob/">Pinterest</a></div>
+  <div class="foot-meta">&copy; 2026 Roberto Russo &middot; built static, served forever</div>
+</footer>
+<script data-goatcounter="https://paleotron.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

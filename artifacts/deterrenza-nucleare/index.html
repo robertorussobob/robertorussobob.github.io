@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOPR // Simulatore di deterrenza</title>
+<style>
+  :root{
+    --bg:#040806; --bg2:#06120c;
+    --green:#36ff7a; --green-dim:#157f3c; --green-deep:#0a3a1d;
+    --amber:#ffb22e; --red:#ff4338; --cyan:#42f0ff; --ink:#9affc0; --grid:#0c2a18; --cyber:#ff5cf0; --threshold:#cbb26a; --contact:#54ff96;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{ background:radial-gradient(120% 90% at 50% 0%, #07140d 0%, var(--bg) 70%);
+    color:var(--green); font-family:"Courier New","DejaVu Sans Mono",ui-monospace,monospace;
+    font-size:13px; line-height:1.45; text-shadow:0 0 4px rgba(54,255,122,.45); overflow-x:hidden; }
+  html.skin-wopr body::after{ content:""; position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0px, rgba(0,0,0,.16) 1px, transparent 2px, transparent 3px),
+      radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,.55) 100%);
+    mix-blend-mode:multiply; animation:flick 6s infinite steps(60); }
+  @keyframes flick{ 0%,97%{opacity:1} 98%{opacity:.86} 99%{opacity:.95} 100%{opacity:1} }
+  header{ border-bottom:1px solid var(--green-dim); padding:10px 16px; display:flex; flex-wrap:wrap; gap:6px 24px; align-items:baseline;
+    background:linear-gradient(180deg, rgba(12,42,24,.5), transparent); }
+  header .title{font-size:16px; letter-spacing:3px; font-weight:bold}
+  header .sub{color:var(--green-dim); letter-spacing:1px}
+  header .status{margin-left:auto; font-weight:bold; letter-spacing:2px}
+  .status.deadlock{color:var(--green)}
+  .status.escal{color:var(--amber); animation:blink 1s steps(2) infinite}
+  .status.terminal{color:var(--red); animation:blink .5s steps(2) infinite}
+  .status.quiet{color:var(--cyan)}
+  @keyframes blink{50%{opacity:.35}}
+  .wrap{display:grid; grid-template-columns:1fr; gap:0; min-height:calc(100vh - 52px)}
+  /* due colonne SOLO su desktop (puntatore fine), non in base alla larghezza che lo zoom falsa: il mobile (pointer:coarse) resta single-column a ogni zoom */
+  @media (min-width:1000px) and (pointer:fine){ .wrap{grid-template-columns:1.5fr 1fr} }
+  .board{position:relative; border-right:1px solid var(--green-deep); padding:6px}
+  canvas{width:100%; height:auto; display:block}
+  .side{display:flex; flex-direction:column; min-width:0}
+  .panel{border-bottom:1px solid var(--green-deep); padding:10px 14px}
+  .panel h2{margin:0 0 8px; font-size:11px; letter-spacing:2px; color:var(--green-dim); font-weight:bold}
+  button{ background:transparent; color:var(--green); border:1px solid var(--green-dim);
+    font-family:inherit; font-size:12px; padding:5px 10px; cursor:pointer; letter-spacing:1px; text-shadow:inherit; transition:all .12s; }
+  button:hover{background:var(--green-deep); border-color:var(--green)}
+  button:active{background:var(--green-dim); color:#031007}
+  button.warn{color:var(--amber); border-color:#7a5410} button.warn:hover{background:#2a1d05; border-color:var(--amber)}
+  button.danger{color:var(--red); border-color:#7a201b} button.danger:hover{background:#2a0a08; border-color:var(--red)}
+  button.cyber{color:var(--cyber); border-color:#7a1a72} button.cyber:hover{background:#2a0826; border-color:var(--cyber)}
+  button.preset{font-size:11px; padding:5px 8px; color:var(--cyan); border-color:#1a5a66} button.preset:hover{background:#072028; border-color:var(--cyan)}
+  .row{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .row + .row{margin-top:8px}
+  label.ctl{display:flex; align-items:center; gap:8px; color:var(--green-dim); font-size:11px}
+  input[type=range]{accent-color:var(--green); width:120px}
+  select{background:var(--bg2); color:var(--green); border:1px solid var(--green-dim); font-family:inherit; font-size:12px; padding:4px 6px}
+  .stats{display:grid; grid-template-columns:1fr auto; gap:3px 14px; font-size:12px}
+  .stats .k{color:var(--green-dim)} .stats .v{text-align:right}
+  .stats .vw{color:var(--amber)} .stats .vg{color:var(--red)}
+  .bar{height:6px; background:var(--green-deep); margin-top:2px; position:relative}
+  .bar>i{position:absolute; left:0; top:0; bottom:0; background:var(--green); display:block}
+  .bar.warn>i{background:var(--amber)} .bar.red>i{background:var(--red)}
+  .log{flex:1; overflow-y:auto; padding:8px 14px; font-size:11.5px; line-height:1.5;
+    background:linear-gradient(180deg, transparent, rgba(6,18,12,.5)); min-height:110px; max-height:30vh}
+  .log .ln{white-space:pre-wrap; opacity:.92}
+  .log .deadhand{color:var(--red); font-weight:bold} .log .low{color:var(--amber)} .log .impact{color:var(--red)}
+  .log .ann{color:var(--red); font-weight:bold; letter-spacing:1px}
+  .log .ride{color:var(--cyan)} .log .inject{color:var(--green); border-left:2px solid var(--green); padding-left:6px}
+  .log .succ{color:var(--cyan)} .log .letter{color:var(--amber)}
+  .log .misw{color:var(--amber); font-weight:bold} .log .misg{color:var(--red); font-weight:bold}
+  .log .hist{color:var(--cyan); border-left:2px solid var(--cyan); padding-left:6px}
+  .log .cyber{color:var(--cyber); font-weight:bold; border-left:2px solid var(--cyber); padding-left:6px}
+  .log .breakout{color:var(--threshold); font-weight:bold; border-left:2px solid var(--threshold); padding-left:6px}
+  .log .advisory{color:var(--green-dim); font-style:italic}
+  .legend{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:10.5px; color:var(--green-dim)}
+  .legend i{display:inline-block; width:9px; height:9px; margin-right:5px; vertical-align:middle}
+  .endmsg{padding:10px 14px; border-top:1px solid var(--green-dim); font-size:12px; display:none}
+  .endmsg.show{display:block}
+  .endmsg .big{font-size:15px; letter-spacing:2px; color:var(--cyan); margin-bottom:4px}
+  .note{color:var(--green-dim); font-size:10.5px; padding:10px 14px; border-top:1px dashed var(--green-deep)}
+  .sel{color:var(--cyan)} a{color:var(--cyan)}
+  .scenario{color:var(--cyan); font-size:11px; min-height:14px; margin-top:6px}
+  table{width:100%; border-collapse:collapse}
+  table td,table th{padding:2px 5px; text-align:left}
+  table th{color:var(--green-dim); font-weight:normal; border-bottom:1px solid var(--green-deep)}
+  td.misw{color:var(--amber); font-weight:bold} td.misg{color:var(--red); font-weight:bold} td.cyber{color:var(--cyber); font-weight:bold}
+  #btnViewSchem,#btnViewGeo{font-size:11px}
+  /* saturazione presentazionale: solo affetto, nessun accoppiamento col modello */
+  #epistemicTag{ position:fixed; left:8px; bottom:6px; z-index:9998; font-size:9.5px; letter-spacing:1.5px;
+    color:var(--green-dim); opacity:.58; pointer-events:none; text-shadow:0 0 4px rgba(54,255,122,.4); }
+  #flashfx{ position:fixed; inset:0; z-index:9997; pointer-events:none; background:#dfffe9; opacity:0; }
+  #flashfx.on{ animation:flashhit .5s ease-out; }
+  @keyframes flashhit{ 0%{opacity:0} 6%{opacity:.8} 100%{opacity:0} }
+  #alertfx{ position:fixed; inset:0; z-index:9995; pointer-events:none; opacity:0; box-shadow:inset 0 0 200px rgba(255,67,56,.55); }
+  #alertfx.on{ opacity:1; animation:def1pulse 1.2s ease-in-out infinite; }
+  @keyframes def1pulse{ 50%{opacity:.4} }
+  #board.shake{ animation:shake .45s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake{ 10%{transform:translate(-2px,1px)} 20%{transform:translate(3px,-2px)} 30%{transform:translate(-4px,2px)}
+    40%{transform:translate(3px,1px)} 50%{transform:translate(-2px,-1px)} 60%{transform:translate(2px,2px)}
+    70%{transform:translate(-3px,-1px)} 80%{transform:translate(2px,-2px)} 90%{transform:translate(-1px,1px)} 100%{transform:translate(0,0)} }
+  html.skin-wopr body::before{ content:""; position:fixed; left:0; right:0; top:-140px; height:140px; z-index:9996; pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(54,255,122,.05) 45%, rgba(54,255,122,.09) 50%, rgba(54,255,122,.05) 55%, transparent);
+    animation:crtsweep 7s linear infinite; }
+  @keyframes crtsweep{ 0%{top:-140px} 100%{top:100%} }
+  #bootfx{ position:fixed; inset:0; z-index:10000; background:var(--bg); color:var(--green); pointer-events:none;
+    display:flex; flex-direction:column; justify-content:center; padding:0 8vw; white-space:pre-wrap;
+    font-size:13px; letter-spacing:1px; animation:bootfade 2.6s forwards; }
+  #bootfx b{ font-size:22px; letter-spacing:5px; display:block; margin-bottom:10px; }
+  @keyframes bootfade{ 0%,78%{opacity:1; visibility:visible} 100%{opacity:0; visibility:hidden} }
+  #btnAudio{ color:var(--cyan); border-color:#1a5a66; }
+  #btnAudio.on{ color:var(--green); border-color:var(--green); background:var(--green-deep); }
+  /* pelle scientifica: niente spettacolo, lettura sobria. Override di variabili + stop a glow e animazioni */
+  html.skin-lab{ --bg:#0c0f12; --bg2:#12171c; --green:#dde6ec; --green-dim:#7f8c97; --green-deep:#1c262f;
+    --grid:#1c262f; --amber:#d9a23c; --red:#d9564b; --cyan:#69b3c6; --ink:#dde6ec; --threshold:#bfae74; --cyber:#c06fb8; --contact:#ffffff; }
+  html.skin-lab body{ background:#0c0f12; }
+  html.skin-lab *{ text-shadow:none !important; animation:none !important; }
+  html.skin-lab #bootfx, html.skin-lab #flashfx, html.skin-lab #alertfx{ display:none !important; }
+  html.skin-lab #btnAudio{ display:none; }
+  html:not(.skin-wopr) #bootfx{ display:none !important; }
+  label.ctl select#skinsel{ margin-left:6px; }
+  .panel.sa{ display:flex; flex-direction:column; flex:1; min-height:0; }
+  .panel.sa .log{ max-height:none; min-height:120px; margin:6px -14px -10px -14px; }
+html.skin-wopr .v{ color:var(--amber); text-shadow:0 0 4px rgba(255,178,46,.45); }
+</style>
+</head>
+<body>
+<div id="bootfx"><b>WOPR</b>WAR OPERATION PLAN RESPONSE
+<span data-i18n="bootConn">NORAD // CONNECTION ESTABLISHED</span>
+<span data-i18n="bootLoad">LOADING LAUNCH PROFILES ... OK</span>
+<span data-i18n="bootArmed">9 PROCESSES ARMED // SHARED SUBSTRATE ACTIVE</span>
+<span data-i18n="bootState">STATE: DEADLOCK</span>
+&gt; SHALL WE PLAY A GAME?</div>
+<div id="flashfx"></div>
+<div id="alertfx"></div>
+<div id="epistemicTag" data-i18n="epistemic">A MODEL TO THINK WITH, NOT A PREDICTION</div>
+<header>
+  <span class="title">WOPR</span>
+  <span class="sub" data-i18n="sub">machine without a kernel // 9 processes // one shared substrate</span>
+  <span class="status deadlock" id="machineStatus">DEADLOCK (STABLE)</span>
+</header>
+
+<div class="wrap">
+  <div class="board" id="board"><canvas id="cv" width="760" height="620"></canvas></div>
+
+  <div class="side">
+    <div class="panel">
+      <h2 data-i18n="hMachine">MACHINE CONTROL</h2>
+      <div class="row">
+        <button id="btnPlay">START</button>
+        <button id="btnStep" data-i18n="btnStep">STEP</button>
+        <button id="btnReset" data-i18n="btnReset">RESET</button>
+        <button id="btnAudio">AUDIO: OFF</button>
+        <label class="ctl"><span data-i18n="lblSkin">skin</span><select id="skinsel"><option value="wopr" data-i18n="optSpectacular">spectacular</option><option value="lab" data-i18n="optScientific">scientific</option></select></label>
+        <label class="ctl"><span data-i18n="lblAccel">acceleration</span><input type="range" id="accel" min="0" max="14" value="6"><span class="v" id="accelv">20&#215;</span></label><label class="ctl"><span data-i18n="lblLang">lang</span><select id="langsel"><option value="en">EN</option><option value="it">IT</option></select></label>
+      </div>
+      <div class="row">
+        <label class="ctl">T+ <span class="v" id="tickv">0:00</span></label>
+        <label class="ctl" style="margin-left:auto"><span data-i18n="lblRide">ride-out (human filter)</span>
+          <input type="range" id="rideout" min="0" max="95" value="25"><span id="rideoutv">.25</span></label>
+      </div>
+      <div class="row">
+        <label class="ctl"><span data-i18n="lblComms">comms quality</span>
+          <input type="range" id="comms" min="0" max="100" value="100"><span id="commsv">100%</span></label>
+        <span class="ctl" style="margin-left:auto;color:var(--cyber)" id="apcp"></span>
+      </div>
+      <div class="row">
+        <label class="ctl" data-i18n="lblView">view</label>
+        <button id="btnViewSchem" data-i18n="viewSchem">SCHEMATIC</button>
+        <button id="btnViewGeo" data-i18n="viewGeo">GEO FLAT</button>
+        <button id="btnViewPolar" data-i18n="viewPolar">GEO POLAR</button>
+        <button id="btnViewGlobe" data-i18n="viewGlobe">GLOBE 3D</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="hScenario">HISTORICAL NEAR-MISS / GUIDED SCENARIO</h2>
+      <div class="row">
+        <button class="preset" data-p="petrov">PETROV 1983</button>
+        <button class="preset" data-p="norad">NORAD 1979</button>
+        <button class="preset" data-p="norvegia" data-i18n="presetNorway">NORWEGIAN ROCKET 1995</button>
+        <button class="preset" data-p="ablearcher">ABLE ARCHER 83</button>
+        <button class="preset" data-p="arkhipov">ARKHIPOV B-59 1962</button>
+      </div>
+      <div class="row">
+        <button class="preset" id="btnPlanA" data-i18n="scPlanA" style="border-color:#7a201b;color:var(--red)">PLAN A: tactical cascade</button>
+        <button class="preset" id="btnDeadHand" data-i18n="scDeadHand" style="border-color:#7a201b;color:var(--red)">DEAD HAND</button>
+        <button class="preset" id="btnCatalitico" data-i18n="scCatalytic" style="border-color:#7a201b;color:var(--red)">CATALYTIC TRIGGER</button>
+        <button class="preset" id="btnCyberScen" data-i18n="scSpoof" style="border-color:#7a1a72;color:var(--cyber)">SPOOFED ORDER</button>
+        <button class="preset" id="btnSudAsia" data-i18n="scSouthAsia" style="border-color:#7a5410;color:var(--amber)">SOUTH ASIA: first use</button>
+        <button class="preset" id="btnBreakoutScen" data-i18n="scProlif" style="border-color:#7a6a1a;color:var(--threshold)">PROLIFERATION</button>
+      </div>
+      <div class="scenario" id="scenario">Same mechanism in all four near-miss cases: a false alarm, and a human filter that absorbs it or not. Load a preset, set the ride-out, press STEP.</div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="hPerturb">PERTURBATIONS (on the selected node)</h2>
+      <div class="row">
+        <label class="ctl"><span data-i18n="lblNode">node</span> <select id="nodesel"></select></label>
+        <span id="nodeinfo" class="sel"></span>
+      </div>
+      <div class="row">
+        <label class="ctl"><span data-i18n="lblFrozen">frozen target</span> <select id="targetsel"></select></label>
+      </div>
+      <div class="row">
+        <button class="warn" id="btnFalse" data-i18n="btnFalse">FALSE ALARM</button>
+        <button class="danger" id="btnDecap" data-i18n="btnDecap">DECAPITATE</button>
+        <button class="danger" id="btnStrike" data-i18n="btnStrike">FIRST STRIKE -&gt; target</button>
+        <button id="btnPosture" data-i18n="btnPosture">CYCLE POSTURE</button>
+      </div>
+      <div class="row">
+        <button class="cyber" id="btnSpoofDet" data-i18n="btnSpoofDet">SPOOF: detection</button>
+        <button class="cyber" id="btnSpoofOrder" data-i18n="btnSpoofOrd">SPOOF: order</button>
+      </div>
+      <div class="row">
+        <button id="btnBreakout" data-i18n="btnBreakout" style="border-color:#7a6a1a;color:var(--threshold)">BREAKOUT IRAN</button>
+      </div>
+      <div class="row" style="margin-top:6px"><div class="legend">
+        <span><i style="background:var(--green)"></i><span data-i18n="legAlive">alive</span></span>
+        <span><i style="background:var(--amber)"></i><span data-i18n="legDecap">decapitated</span></span>
+        <span><i style="background:var(--red)"></i><span data-i18n="legAnn">annihilated</span></span>
+        <span><i style="background:var(--cyan)"></i><span data-i18n="legFalse">false belief</span></span>
+        <span><i style="background:var(--cyber)"></i><span data-i18n="legCyber">byzantine input (cyber)</span></span>
+        <span><i style="background:var(--threshold)"></i><span data-i18n="legThresh">threshold (unarmed)</span></span>
+      </div></div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="hWorld">WORLD STATE</h2>
+      <div class="stats">
+        <span class="k" data-i18n="stAliveLbl">alive / decapitated / annihilated</span><span class="v"><span id="sAlive">9</span> / <span id="sDecap">0</span> / <span id="sAnn">0</span></span>
+        <span class="k" data-i18n="stMis">missiles in flight</span><span class="v" id="sMis">0</span>
+        <span class="k" data-i18n="stBelief">believe under attack / truly under attack</span><span class="v" id="sBelief">0 / 0</span>
+        <span class="k" data-i18n="stCascade">cascade depth (nodes that fired)</span><span class="v" id="sCascade">0</span>
+        <span class="k" data-i18n="stWrong">retaliations on the wrong party</span><span class="v vw" id="sWrong">0</span>
+        <span class="k" data-i18n="stGhost">retaliations for a nonexistent attack</span><span class="v vg" id="sGhost">0</span>
+        <span class="k" data-i18n="stCyber">launches from a spoofed order (cyber)</span><span class="v" style="color:var(--cyber)" id="sCyber">0</span>
+      </div>
+      <div style="margin-top:8px">
+        <span class="k" data-i18n="stPop" style="color:var(--green-dim);font-size:11px">residual world population</span>
+        <div class="bar" id="popbarwrap"><i id="popbar" style="width:100%"></i></div>
+      </div>
+      <div style="margin-top:6px">
+        <span class="k" data-i18n="stArs" style="color:var(--green-dim);font-size:11px">residual global arsenal</span>
+        <div class="bar" id="arsbarwrap"><i id="arsbar" style="width:100%"></i></div>
+      </div>
+      <div style="margin-top:6px">
+        <span class="k" data-i18n="stCommsBar" style="color:var(--green-dim);font-size:11px">comms quality (low = act without confirming)</span>
+        <div class="bar" id="commsbarwrap"><i id="commsbar" style="width:100%"></i></div>
+      </div>
+    </div>
+
+    <div class="panel sa">
+      <h2>SITUATIONAL AWARENESS</h2>
+      <div class="row" style="align-items:baseline">
+        <span id="saDefcon" style="font-size:18px;font-weight:bold;letter-spacing:2px;color:var(--green)">DEFCON 5</span>
+      </div>
+      <div class="stats" style="margin-top:6px">
+        <span class="k" data-i18n="saLaunch">total launches / in flight / impacts</span><span class="v"><span id="saLaunch">0</span> / <span id="saFlight">0</span> / <span id="saImpact">0</span></span>
+        <span class="k" data-i18n="saAnnLbl">annihilated / pop lost</span><span class="v"><span id="saAnn">0</span> / <span id="saPop">-0%</span></span>
+      </div>
+      <table style="margin-top:8px;font-size:11px">
+        <thead><tr><th data-i18n="thTrack">track</th><th data-i18n="thEta">ETA</th><th data-i18n="thWar">warheads</th><th data-i18n="thTag">tag</th></tr></thead>
+        <tbody id="saTracks"><tr><td colspan="4" style="color:var(--green-dim)">no track</td></tr></tbody>
+      </table>
+      <h2 data-i18n="hEvents" style="margin-top:10px;border-top:1px solid var(--green-deep);padding-top:8px">EVENT STREAM</h2>
+      <div class="log" id="log"></div>
+    </div>
+    <div class="endmsg" id="endmsg"></div>
+
+    <div class="note"><span data-i18n="footerNote">footer</span></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* MOTORE verificato + strato di interazione + scenario guidato + cyber/comms */
+const MIN_PER_TICK=2, FLIGHT_TICK_MIN=2, LANE_MAX=9, GHOST_TTL=5, SETTLE=14;
+function makeRng(seed){
+  let h=2166136261>>>0; const str="seed:"+seed;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); }
+  let a=h>>>0;
+  const r=()=>{ a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+  for(let i=0;i<16;i++) r(); return r;
+}
+const DEF=[
+  ["USA","LOW","INCOMING","LIVE_SUCCESSION",1700,"Russia"],
+  ["Russia","LOW","INCOMING","AUTOMATON",1700,"USA"],
+  ["UK","RIDEOUT","DETONATION","SCRIPTED_HUMAN",120,"Russia"],
+  ["Francia","RIDEOUT","DETONATION","SCRIPTED_HUMAN",120,"Russia"],
+  ["Cina","RECESSED","DETONATION","NONE",600,"USA"],
+  ["India","RECESSED","DETONATION","NONE",170,"Cina"],
+  ["Pakistan","RECESSED","FIRST_USE","NONE",170,"India"],
+  ["NordCorea","RECESSED","FIRST_USE","AUTOMATON",50,"USA"],
+  ["Israele","RIDEOUT","DECAP_ONLY","SCRIPTED_HUMAN",90,"Iran"],
+  ["Iran","SOGLIA","THRESHOLD","NONE",0,"Israele"],
+  ["ArabiaSaudita","SOGLIA","THRESHOLD","NONE",0,"Iran"],
+];
+let rng, nodes, missiles, tick, everLaunched, lastEventTick, terminal;
+let wrongCount, ghostCount, cascadeLaunchers, believers, trulyUnder;
+let RIDEOUT_PROB=0.25, selected=0;
+let scenarioScript=null, narrationTag="";
+let commsQuality=1.0, cyberLaunches=0;
+let viewMode="schem", totalLaunches=0, impacts=0, iranBroken=false;
+let nodeFront=[], nodeDepth=[], globeSpin=0; const GLOBE_PERIOD=20000, GLOBE_TILT=0.42;
+let reactQueue={};
+const REACTIVE={ "ArabiaSaudita":{ rival:"Iran", delay:9 } };
+const GEO_LL={ USA:[-77,38.9], Russia:[37.6,55.75], UK:[-0.12,51.5], Francia:[2.35,48.85], Cina:[116.4,39.9], India:[77.2,28.6], Pakistan:[73.06,33.7], NordCorea:[125.75,39.03], Israele:[35.21,31.77], Iran:[51.39,35.69], ArabiaSaudita:[46.7,24.7] };
+const LAT_MAX=83, LAT_MIN=-58;
+const COAST=[[[-65.0,-54.7],[-69.2,-55.5],[-74.7,-52.8],[-71.1,-54.1],[-69.3,-52.5],[-65.0,-54.7]],[[70.3,-49.7],[68.7,-49.8],[68.9,-48.6],[70.3,-49.7]],[[145.4,-40.8],[148.3,-40.9],[147.9,-43.2],[146.0,-43.5],[145.4,-40.8]],[[173.0,-40.9],[174.2,-41.3],[173.1,-43.9],[169.3,-46.6],[166.7,-46.2],[173.0,-40.9]],[[176.8,-37.9],[178.5,-37.7],[175.2,-41.7],[173.8,-39.5],[174.7,-37.4],[172.6,-34.5],[176.8,-37.9]],[[50.4,-15.7],[47.1,-24.9],[44.0,-25.0],[43.3,-22.1],[44.4,-16.2],[47.7,-14.6],[49.2,-12.0],[50.4,-15.7]],[[143.6,-13.8],[145.4,-15.0],[146.4,-19.0],[153.1,-26.1],[152.9,-31.6],[150.0,-37.4],[146.3,-39.0],[145.0,-37.9],[143.6,-38.8],[140.6,-38.0],[138.2,-34.4],[136.8,-35.3],[137.8,-32.9],[136.0,-34.9],[134.3,-32.6],[131.3,-31.5],[118.0,-35.1],[115.0,-34.2],[115.7,-31.6],[113.3,-26.1],[114.2,-26.3],[113.4,-24.4],[114.1,-21.8],[120.9,-19.7],[125.7,-14.2],[129.6,-15.0],[132.4,-11.1],[136.5,-11.9],[135.5,-15.0],[140.2,-17.7],[142.5,-10.7],[143.6,-13.8]],[[115.7,-8.4],[105.4,-6.9],[106.1,-5.9],[115.7,-8.4]],[[152.0,-5.5],[148.3,-5.7],[150.8,-5.5],[151.5,-4.2],[152.0,-5.5]],[[134.1,-1.2],[135.5,-3.4],[138.3,-1.7],[144.6,-3.9],[150.7,-10.6],[147.9,-10.1],[144.7,-7.6],[142.6,-9.3],[137.6,-8.4],[138.7,-7.3],[137.9,-5.4],[133.0,-4.1],[132.0,-2.8],[133.7,-2.2],[130.5,-0.9],[134.1,-1.2]],[[125.2,1.4],[120.2,0.2],[120.9,-1.4],[123.3,-0.6],[121.5,-1.9],[123.2,-5.3],[121.5,-4.6],[121.0,-2.6],[120.4,-5.5],[119.4,-5.4],[118.8,-2.8],[120.0,0.6],[125.2,1.4]],[[105.8,-5.9],[102.6,-4.2],[95.3,5.5],[97.5,5.2],[103.8,0.1],[103.4,-0.7],[106.1,-3.1],[105.8,-5.9]],[[119.0,0.9],[117.8,0.8],[116.1,-4.0],[110.2,-2.9],[109.1,-0.5],[109.7,2.0],[113.0,3.1],[116.7,6.9],[119.2,5.4],[117.3,3.2],[119.0,0.9]],[[126.4,8.4],[125.4,5.6],[123.6,7.8],[121.9,7.2],[125.4,9.8],[126.4,8.4]],[[81.2,6.2],[79.9,6.8],[80.1,9.8],[81.8,7.5],[81.2,6.2]],[[123.0,9.0],[122.4,9.7],[124.1,11.2],[123.0,9.0]],[[121.9,11.9],[123.1,11.6],[122.0,10.4],[121.9,11.9]],[[125.5,12.2],[124.8,10.1],[124.3,12.6],[125.5,12.2]],[[121.3,18.5],[122.5,17.1],[121.7,14.3],[124.0,13.8],[124.1,12.5],[120.1,15.0],[121.3,18.5]],[[-68.3,18.6],[-71.4,17.6],[-74.5,18.3],[-72.3,18.7],[-73.4,19.6],[-68.3,18.6]],[[110.3,18.7],[108.6,19.4],[110.8,20.1],[110.3,18.7]],[[-74.2,20.3],[-77.8,19.9],[-77.1,20.4],[-78.7,21.6],[-81.8,22.6],[-85.0,21.9],[-82.3,23.2],[-74.2,20.3]],[[120.7,22.0],[120.1,23.6],[121.5,25.3],[120.7,22.0]],[[15.5,38.2],[15.1,36.6],[12.4,37.6],[15.5,38.2]],[[9.2,41.2],[9.7,39.2],[8.8,38.9],[8.2,41.0],[9.2,41.2]],[[140.3,35.1],[135.8,33.5],[135.1,34.6],[131.0,33.9],[132.0,33.1],[130.2,31.4],[129.4,33.3],[132.6,35.4],[135.7,35.5],[136.7,37.3],[139.4,38.2],[139.9,40.6],[141.4,41.4],[140.3,35.1]],[[9.2,41.4],[8.5,42.3],[9.4,43.0],[9.2,41.4]],[[145.3,44.4],[145.5,43.3],[140.0,41.6],[142.0,45.6],[145.3,44.4]],[[-56.8,49.8],[-53.5,49.2],[-53.1,46.7],[-54.2,47.8],[-55.4,46.9],[-59.3,47.6],[-55.4,51.6],[-56.8,49.8]],[[144.7,49.0],[143.2,49.3],[143.5,46.1],[142.1,46.0],[142.2,54.2],[144.7,49.0]],[[-6.8,52.3],[-10.0,51.8],[-9.7,53.9],[-6.7,55.2],[-5.7,54.6],[-6.8,52.3]],[[12.7,55.6],[12.1,54.8],[10.9,55.8],[12.7,55.6]],[[-3.0,58.6],[-4.1,57.6],[-2.0,57.7],[-3.1,56.0],[1.7,52.7],[1.4,51.3],[-5.2,50.0],[-3.4,51.4],[-5.3,52.0],[-4.2,52.3],[-4.6,53.5],[-2.9,54.0],[-6.1,56.8],[-5.0,58.6],[-3.0,58.6]],[[-85.2,65.7],[-80.1,63.7],[-87.2,63.5],[-85.2,65.7]],[[-14.5,66.5],[-13.6,65.1],[-18.7,63.5],[-22.8,64.0],[-21.8,64.4],[-24.0,64.9],[-22.2,65.4],[-24.3,65.6],[-14.5,66.5]],[[-175.0,66.6],[-169.9,66.0],[-172.5,65.4],[-173.0,64.3],[-178.7,66.1],[-180.0,65.0],[-180.0,69.0],[-175.0,66.6]],[[-95.6,69.1],[-99.8,69.4],[-98.2,70.1],[-95.6,69.1]],[[-90.5,69.5],[-90.6,68.5],[-89.2,69.3],[-87.4,67.2],[-85.5,69.9],[-82.6,69.7],[-81.3,69.2],[-81.3,67.6],[-85.8,66.6],[-93.2,62.0],[-94.7,58.9],[-92.3,57.1],[-82.3,55.1],[-82.1,53.3],[-79.9,51.2],[-78.6,52.6],[-79.8,54.7],[-76.5,56.5],[-78.5,58.8],[-77.3,59.9],[-78.1,62.3],[-73.8,62.4],[-69.6,61.1],[-69.3,59.0],[-67.6,58.2],[-64.6,60.3],[-61.8,56.3],[-57.3,54.6],[-55.7,52.1],[-60.0,50.2],[-66.4,50.2],[-71.1,46.8],[-65.1,49.2],[-64.5,46.2],[-61.5,45.9],[-60.5,47.0],[-59.8,45.9],[-65.4,43.5],[-66.2,44.5],[-64.4,45.3],[-67.1,45.1],[-70.7,43.0],[-70.0,41.6],[-75.5,39.5],[-75.9,37.2],[-76.3,39.2],[-75.7,35.6],[-81.3,31.4],[-80.4,25.2],[-84.1,30.1],[-93.8,29.7],[-96.6,28.3],[-97.9,22.4],[-96.3,19.3],[-94.4,18.1],[-92.0,18.7],[-90.3,21.0],[-87.1,21.5],[-88.9,15.9],[-83.4,15.3],[-83.8,11.1],[-81.4,8.8],[-79.6,9.6],[-76.8,8.6],[-74.9,11.1],[-71.8,12.4],[-71.7,9.1],[-69.9,12.2],[-68.2,10.6],[-61.9,10.7],[-62.4,9.9],[-57.1,6.0],[-51.3,4.2],[-50.4,-0.1],[-44.9,-1.6],[-44.6,-2.7],[-40.0,-2.9],[-35.6,-5.1],[-34.7,-7.3],[-38.7,-13.1],[-40.9,-21.9],[-47.6,-24.9],[-48.9,-28.7],[-53.8,-34.4],[-58.4,-33.9],[-56.8,-36.9],[-59.2,-38.7],[-62.3,-38.8],[-62.7,-41.0],[-65.1,-41.1],[-63.5,-42.6],[-67.3,-45.6],[-66.0,-48.1],[-69.1,-50.7],[-68.2,-52.3],[-71.0,-53.8],[-74.9,-52.3],[-75.6,-48.7],[-74.1,-46.9],[-75.6,-46.6],[-72.7,-42.4],[-74.3,-43.2],[-73.6,-37.2],[-71.4,-32.4],[-70.2,-19.8],[-71.5,-17.4],[-76.0,-14.6],[-81.2,-6.1],[-79.8,-2.7],[-80.9,-1.1],[-77.1,3.8],[-78.2,8.3],[-79.6,8.9],[-80.9,7.2],[-85.7,9.9],[-87.5,13.3],[-103.5,18.3],[-105.5,19.9],[-106.0,22.8],[-114.8,31.8],[-109.4,23.2],[-112.2,24.7],[-115.1,27.7],[-114.2,28.6],[-117.3,33.0],[-120.6,34.6],[-124.4,40.3],[-124.7,48.2],[-122.6,47.1],[-122.8,49.0],[-127.4,50.8],[-134.1,58.1],[-147.1,60.9],[-151.7,59.2],[-150.6,61.3],[-158.4,56.0],[-164.8,54.4],[-157.7,57.6],[-157.0,58.9],[-162.0,58.7],[-161.9,59.6],[-166.1,61.5],[-164.6,63.1],[-160.8,63.8],[-160.8,64.8],[-165.0,64.4],[-168.1,65.7],[-161.7,66.1],[-166.8,68.4],[-156.6,71.4],[-136.5,68.9],[-128.1,70.5],[-108.9,67.4],[-108.2,68.7],[-106.2,68.8],[-101.5,67.6],[-97.7,68.6],[-96.1,67.3],[-94.2,69.1],[-96.5,70.1],[-95.2,71.9],[-90.5,69.5]],[[-109.9,73.0],[-108.2,71.7],[-108.4,73.1],[-106.5,73.1],[-101.1,69.6],[-113.3,68.5],[-117.3,70.0],[-112.4,70.4],[-119.4,71.6],[-109.9,73.0]],[[-86.6,73.2],[-82.3,73.8],[-80.7,72.1],[-77.8,72.7],[-72.2,71.6],[-67.0,69.2],[-68.8,68.7],[-61.9,66.9],[-63.9,65.0],[-68.0,66.3],[-64.7,63.4],[-68.8,63.7],[-66.2,61.9],[-74.8,64.7],[-77.7,64.2],[-77.9,65.3],[-74.0,65.5],[-72.9,67.7],[-79.0,70.2],[-89.9,71.2],[-89.4,73.1],[-85.8,73.8],[-86.6,73.2]],[[-97.4,73.8],[-98.1,73.0],[-96.7,71.7],[-102.5,72.5],[-100.4,72.7],[-101.5,73.4],[-97.4,73.8]],[[-95.4,72.1],[-96.0,73.4],[-90.5,73.9],[-95.4,72.1]],[[-120.5,71.4],[-125.9,71.9],[-123.9,73.7],[-124.9,74.3],[-115.5,73.5],[-120.5,71.4]],[[145.1,75.6],[137.0,75.3],[138.8,76.1],[145.1,75.6]],[[-98.5,76.7],[-98.2,75.0],[-102.5,75.6],[-98.5,76.7]],[[-105.7,75.5],[-112.2,74.4],[-113.9,74.7],[-111.8,75.2],[-117.7,75.2],[-115.4,76.5],[-105.7,75.5]],[[57.5,70.7],[51.5,72.0],[55.6,75.1],[68.9,76.5],[58.5,74.3],[55.4,72.4],[57.5,70.7]],[[-79.8,74.9],[-89.8,74.5],[-97.1,76.8],[-79.8,74.9]],[[-116.2,77.6],[-117.1,76.5],[-122.9,76.1],[-116.2,77.6]],[[114.1,75.8],[109.4,74.2],[127.0,73.6],[131.3,70.8],[132.3,71.8],[139.9,71.5],[139.1,72.4],[140.5,72.8],[169.6,68.7],[170.8,69.0],[170.5,70.1],[175.7,69.9],[180.0,69.0],[180.0,65.0],[177.4,64.6],[179.2,62.3],[173.7,61.7],[170.3,59.9],[163.5,59.9],[162.0,58.2],[163.2,57.6],[162.1,54.9],[156.8,51.0],[155.9,56.8],[164.5,62.6],[160.1,60.5],[159.3,61.8],[156.7,61.4],[154.2,59.8],[155.0,59.1],[142.2,59.0],[135.1,54.7],[139.9,54.2],[141.4,52.2],[138.2,46.3],[127.5,39.8],[129.5,36.8],[129.1,35.1],[126.5,34.4],[126.9,36.9],[124.7,38.1],[125.3,39.6],[121.1,38.9],[121.6,40.9],[118.0,39.2],[118.9,37.4],[122.4,37.5],[119.2,34.9],[121.9,31.7],[121.7,28.2],[115.9,22.8],[110.8,21.4],[110.4,20.3],[108.5,21.7],[105.9,19.8],[109.3,13.4],[109.2,11.7],[105.2,8.6],[105.1,9.9],[100.1,13.4],[99.2,9.2],[103.0,5.5],[104.2,1.3],[101.4,2.8],[100.1,6.5],[98.3,7.8],[98.8,11.4],[97.2,16.9],[94.2,16.0],[94.3,18.2],[91.4,22.8],[87.0,21.5],[80.3,15.9],[79.9,10.4],[77.5,8.0],[73.5,16.0],[72.6,21.4],[70.5,20.9],[66.4,25.4],[57.4,25.7],[56.5,27.1],[54.7,26.5],[51.5,27.9],[50.1,30.1],[48.0,30.0],[51.8,24.0],[54.0,24.1],[56.4,26.4],[56.8,24.2],[59.8,22.3],[55.3,17.2],[43.5,12.6],[42.6,16.8],[34.6,28.1],[34.9,29.5],[33.9,27.6],[32.4,29.9],[36.9,22.0],[37.5,18.6],[43.3,12.4],[42.7,11.7],[44.6,10.4],[51.1,12.0],[51.0,10.6],[47.7,4.2],[39.2,-4.7],[40.8,-14.7],[34.8,-19.8],[35.6,-23.7],[32.6,-25.7],[32.2,-28.8],[25.8,-33.9],[18.4,-34.1],[11.8,-18.1],[13.7,-10.7],[11.9,-5.0],[8.8,-1.1],[9.4,3.7],[8.5,4.8],[5.9,4.3],[4.3,6.3],[-2.0,4.7],[-9.0,4.8],[-16.6,12.2],[-17.6,14.7],[-16.1,18.1],[-17.0,21.9],[-5.9,35.8],[-2.2,35.2],[9.5,37.4],[11.1,36.9],[10.3,33.8],[19.1,30.3],[21.5,32.8],[28.9,30.9],[33.8,31.0],[36.2,36.7],[27.6,36.7],[26.2,39.5],[33.5,42.0],[38.3,40.9],[41.7,42.0],[36.7,45.2],[39.1,47.3],[35.0,46.3],[36.3,45.1],[33.9,44.4],[32.5,45.3],[33.3,46.1],[30.7,46.6],[27.7,42.6],[28.8,41.1],[22.6,40.3],[24.0,37.7],[22.5,36.4],[19.4,40.3],[19.5,41.7],[13.1,45.7],[12.6,44.1],[18.5,40.2],[16.9,40.4],[16.1,38.0],[15.4,40.0],[8.9,44.4],[3.1,43.1],[-2.1,36.7],[-5.4,35.9],[-8.9,36.9],[-9.4,43.0],[-1.4,44.0],[-1.2,46.0],[-4.6,48.7],[-1.6,48.6],[-1.9,49.8],[1.3,50.1],[4.7,53.1],[8.1,53.5],[8.5,57.1],[10.6,57.7],[9.7,55.5],[10.9,54.0],[19.7,54.4],[21.3,55.2],[21.6,57.4],[24.1,57.0],[23.3,59.2],[29.1,60.0],[21.3,60.7],[21.5,63.2],[25.4,65.1],[22.2,65.7],[17.8,62.7],[17.1,61.3],[18.8,60.1],[15.9,56.1],[12.9,55.4],[10.4,59.5],[5.7,58.6],[5.0,62.0],[14.8,67.8],[24.5,71.0],[28.2,71.2],[41.1,67.5],[38.4,66.0],[33.2,66.6],[37.0,63.8],[37.2,65.1],[39.6,64.5],[42.1,66.5],[43.9,66.1],[43.5,68.6],[46.3,68.3],[46.3,66.7],[53.7,68.9],[59.9,68.3],[61.1,68.9],[60.6,69.9],[68.5,68.1],[69.2,68.6],[66.9,69.5],[66.7,71.0],[69.2,72.8],[72.6,72.8],[71.8,71.4],[73.7,68.4],[71.3,66.3],[72.4,66.2],[75.1,67.8],[73.1,71.4],[74.7,72.8],[76.4,71.2],[75.9,71.9],[77.6,72.3],[81.5,71.8],[80.5,73.6],[86.8,73.9],[86.0,74.5],[87.2,75.1],[104.4,77.7],[114.1,75.8]],[[-100.1,78.3],[-105.2,78.4],[-104.2,78.7],[-105.5,79.3],[-100.1,78.3]],[[105.1,78.3],[99.4,77.9],[102.1,79.3],[105.1,78.3]],[[21.5,79.0],[15.9,76.8],[10.4,79.7],[21.5,79.0]],[[99.9,78.9],[91.2,80.3],[95.9,81.3],[100.2,79.8],[99.9,78.9]],[[-85.8,79.3],[-90.8,78.2],[-96.7,80.2],[-92.4,81.3],[-85.8,79.3]],[[-61.9,82.6],[-76.9,79.3],[-75.4,78.5],[-80.6,76.2],[-89.5,76.5],[-87.8,77.2],[-88.3,77.9],[-85.0,77.5],[-88.0,78.4],[-85.1,79.3],[-86.9,80.3],[-81.8,80.5],[-91.6,81.9],[-61.9,82.6]],[[-27.1,83.5],[-20.8,82.7],[-31.9,82.2],[-12.2,81.3],[-20.0,80.2],[-17.7,80.1],[-19.7,78.8],[-18.5,77.0],[-21.7,76.6],[-19.8,76.1],[-20.7,75.2],[-19.4,74.3],[-23.6,73.3],[-22.3,72.2],[-24.8,72.3],[-21.8,70.7],[-25.5,71.4],[-26.4,70.2],[-22.3,70.1],[-39.8,65.5],[-42.8,62.7],[-43.4,60.1],[-48.3,60.9],[-51.6,63.6],[-54.0,67.2],[-50.9,69.9],[-54.7,69.6],[-54.4,70.8],[-51.4,70.6],[-55.8,71.7],[-54.7,72.6],[-58.6,75.5],[-68.5,76.1],[-71.4,77.0],[-66.8,77.4],[-73.3,78.0],[-65.7,79.4],[-68.0,80.1],[-62.7,81.8],[-44.5,81.7],[-46.8,82.6],[-27.1,83.5]]];
+function project(lon,lat){ return { x:(lon+180)/360*W, y:(LAT_MAX-lat)/(LAT_MAX-LAT_MIN)*H }; }
+const POLAR_FLOOR=-10;
+function projectPolar(lon,lat){ const cx=W/2, cy=H/2+6, Rmax=Math.min(W,H)*0.46; const r=Rmax*(90-lat)/(90-POLAR_FLOOR); const th=lon*Math.PI/180; return { x:cx+r*Math.sin(th), y:cy-r*Math.cos(th) }; }
+function proj(lon,lat){ return viewMode==="polar"? projectPolar(lon,lat) : project(lon,lat); }
+function llToVec(lon,lat){ const la=lat*Math.PI/180, lo=lon*Math.PI/180; return [Math.cos(la)*Math.cos(lo), Math.cos(la)*Math.sin(lo), Math.sin(la)]; }
+function vecToLL(v){ return [Math.atan2(v[1],v[0])*180/Math.PI, Math.asin(Math.max(-1,Math.min(1,v[2])))*180/Math.PI]; }
+function gcPath(lonA,latA,lonB,latB,steps){ const a=llToVec(lonA,latA), b=llToVec(lonB,latB);
+  let dot=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; dot=Math.max(-1,Math.min(1,dot)); const om=Math.acos(dot); const out=[];
+  if(om<1e-6){ for(let i=0;i<=steps;i++){ const p=i/steps; out.push([lonA+(lonB-lonA)*p, latA+(latB-latA)*p]); } return out; }
+  const so=Math.sin(om); for(let i=0;i<=steps;i++){ const p=i/steps; const s1=Math.sin((1-p)*om)/so, s2=Math.sin(p*om)/so;
+    out.push(vecToLL([s1*a[0]+s2*b[0], s1*a[1]+s2*b[1], s1*a[2]+s2*b[2]])); } return out; }
+function slerpVec(a,b,p){ let dot=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; dot=Math.max(-1,Math.min(1,dot)); const om=Math.acos(dot);
+  if(om<1e-6) return [a[0]+(b[0]-a[0])*p, a[1]+(b[1]-a[1])*p, a[2]+(b[2]-a[2])*p];
+  const so=Math.sin(om), s1=Math.sin((1-p)*om)/so, s2=Math.sin(p*om)/so;
+  return [s1*a[0]+s2*b[0], s1*a[1]+s2*b[1], s1*a[2]+s2*b[2]]; }
+function arcAngle(a,b){ let dot=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; return Math.acos(Math.max(-1,Math.min(1,dot))); }
+function gcAt(lonA,latA,lonB,latB,p){ return vecToLL(slerpVec(llToVec(lonA,latA), llToVec(lonB,latB), p)); }
+const ALT_BASE=0.05, ALT_RANGE=0.22;
+function ballisticAlt(p, ang){ return Math.sin(Math.PI*p)*(ALT_BASE+ALT_RANGE*(ang/Math.PI)); }
+function node3D(idx){ const ll=GEO_LL[nodes[idx].name]; return llToVec(ll[0], ll[1]); }
+function missile3D(m, p){ const A=GEO_LL[m.from], B=GEO_LL[m.to]; const a=llToVec(A[0],A[1]), b=llToVec(B[0],B[1]);
+  const g=slerpVec(a,b,p), alt=ballisticAlt(p, arcAngle(a,b)), h=1+alt;
+  return { x:g[0]*h, y:g[1]*h, z:g[2]*h, gx:g[0], gy:g[1], gz:g[2], alt, ll:vecToLL(g) }; }
+const FLIGHT_ANCHORS=[[0.11,5],[0.25,12],[1.22,30],[1.6,33]];  // arco great-circle (rad) -> minuti di volo reali: India-Pakistan, Iran-Israele, USA-Russia, intercontinentale lungo
+function flightMinutes(ang){ const A=FLIGHT_ANCHORS; if(ang<=A[0][0]) return A[0][1];
+  for(let i=1;i<A.length;i++){ if(ang<=A[i][0]){ const a=A[i-1], b=A[i]; return a[1]+(b[1]-a[1])*(ang-a[0])/(b[0]-a[0]); } }
+  return A[A.length-1][1]; }
+function worldClock(){ const tm=tick*MIN_PER_TICK, hh=Math.floor(tm/60), mm=tm%60; return hh+":"+String(mm).padStart(2,"0"); }
+function camRot(v){ const cs=Math.cos(globeSpin), sn=Math.sin(globeSpin), ct=Math.cos(GLOBE_TILT), st=Math.sin(GLOBE_TILT);
+  const xs=v[0]*cs - v[1]*sn, ys=v[0]*sn + v[1]*cs, zs=v[2];
+  return [xs, ys*ct + zs*st, -ys*st + zs*ct]; }   // [destra, profondita (+verso camera), su]
+function projGlobe(v){ const r=camRot(v), cx=W/2, cy=H/2+10, S=Math.min(W,H)*0.34;
+  return { x:cx+r[0]*S, y:cy-r[2]*S, depth:r[1], front:r[1]>=0 }; }
+function trackDoubt(px,py){ ctx.globalAlpha=1; ctx.strokeStyle=getCss('--cyan'); ctx.lineWidth=1.2; ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.arc(px,py,7,0,7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=getCss('--cyan'); ctx.font="bold 11px monospace"; ctx.textAlign="center"; ctx.fillText("?", px, py-9); }
+function lane(m,sx,sy,tx,ty){ const dx=tx-sx, dy=ty-sy, L=Math.hypot(dx,dy)||1, k=(m.spread||0)*LANE_MAX; return [-dy/L*k, dx/L*k]; }
+function radarReturn(px,py,len,w,glow){ const cx=W/2, cy=H/2+10, dx=px-cx, dy=py-cy, r=Math.hypot(dx,dy)||1, th=Math.atan2(dy,dx), d=len/(2*r);
+  ctx.lineWidth=w; ctx.lineCap="round"; if(glow){ ctx.shadowColor=ctx.strokeStyle; ctx.shadowBlur=8; }
+  ctx.beginPath(); ctx.arc(cx,cy,r,th-d,th+d); ctx.stroke(); if(glow) ctx.shadowBlur=0; ctx.lineCap="butt"; }
+function drawGlobe(){ const cx=W/2, cy=H/2+10, S=Math.min(W,H)*0.34;
+  ctx.fillStyle="rgba(4,19,11,.55)"; ctx.strokeStyle=getCss('--green-dim'); ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.arc(cx,cy,S,0,7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle=getCss('--grid'); ctx.lineWidth=1;
+  for(let lon=0;lon<360;lon+=30){ ctx.beginPath(); let st=false;
+    for(let lat=-80;lat<=80;lat+=8){ const q=projGlobe(llToVec(lon,lat)); if(!q.front){ st=false; continue; } if(!st){ ctx.moveTo(q.x,q.y); st=true; } else ctx.lineTo(q.x,q.y); } ctx.stroke(); }
+  for(let lat=-60;lat<=60;lat+=30){ ctx.beginPath(); let st=false;
+    for(let lon=0;lon<=360;lon+=8){ const q=projGlobe(llToVec(lon,lat)); if(!q.front){ st=false; continue; } if(!st){ ctx.moveTo(q.x,q.y); st=true; } else ctx.lineTo(q.x,q.y); } ctx.stroke(); }
+  ctx.strokeStyle="rgba(54,255,122,.30)"; ctx.lineWidth=1;
+  for(const poly of COAST){ ctx.beginPath(); let st=false;
+    for(const pt of poly){ const q=projGlobe(llToVec(pt[0],pt[1])); if(!q.front){ st=false; continue; } if(!st){ ctx.moveTo(q.x,q.y); st=true; } else ctx.lineTo(q.x,q.y); } ctx.stroke(); } }
+function defconLevel(){ const ann=nodes.filter(n=>n.annihilated).length;
+  if(ann>0) return 1; if(missiles.length>0||cascadeLaunchers.size>0) return 2;
+  if(believers>=2||nodes.some(n=>n.pendingDecap>0)) return 3;
+  if(believers>0||nodes.some(n=>n.ghostAlarm>0||n.spoofed)) return 4; return 5; }
+function drawCoast(){ ctx.strokeStyle="rgba(54,255,122,.32)"; ctx.lineWidth=1; const polar=viewMode==="polar";
+  for(const poly of COAST){ ctx.beginPath(); let started=false, px=null;
+    for(const pt of poly){ if(polar && pt[1]<POLAR_FLOOR){ started=false; continue; } const q=proj(pt[0],pt[1]);
+      if(!started){ ctx.moveTo(q.x,q.y); started=true; }
+      else if(!polar && Math.abs(q.x-px)>W*0.5){ ctx.stroke(); ctx.beginPath(); ctx.moveTo(q.x,q.y); }
+      else { ctx.lineTo(q.x,q.y); } px=q.x; }
+    ctx.stroke(); } }
+function drawGraticule(){ ctx.strokeStyle=getCss('--grid'); ctx.lineWidth=1;
+  if(viewMode==="polar"){ const cx=W/2, cy=H/2+6, Rmax=Math.min(W,H)*0.46;
+    for(const lat of [60,30,0]){ const r=Rmax*(90-lat)/(90-POLAR_FLOOR); ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke(); }
+    for(let lon=0;lon<360;lon+=30){ const e=projectPolar(lon,POLAR_FLOOR); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(e.x,e.y); ctx.stroke(); }
+    ctx.fillStyle=getCss('--green-dim'); ctx.font="9px monospace"; ctx.textAlign="center"; ctx.fillText("POLO NORD", cx, cy-5); return; }
+  for(let lon=-180;lon<=180;lon+=30){ const a=project(lon,LAT_MAX), b=project(lon,LAT_MIN); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  for(let lat=-40;lat<=80;lat+=20){ const a=project(-180,lat), b=project(180,lat); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } }
+function drawHUD(){ const lvl=defconLevel(); const cmap={5:'--green',4:'--cyan',3:'--amber',2:'--amber',1:'--red'}; let col=getCss(cmap[lvl]);
+  ctx.fillStyle="rgba(2,8,5,.74)"; ctx.fillRect(6,6,150,46); ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.strokeRect(6,6,150,46);
+  ctx.textAlign="left"; ctx.font="bold 22px monospace"; ctx.fillStyle=(lvl===1 && tick%2===0)?"rgba(255,67,56,.35)":col; ctx.fillText("DEFCON "+lvl, 16, 38);
+  ctx.fillStyle="rgba(2,8,5,.74)"; ctx.fillRect(W-120,6,114,22); ctx.strokeStyle=getCss('--green-dim'); ctx.lineWidth=1; ctx.strokeRect(W-120,6,114,22);
+  ctx.fillStyle=getCss('--amber'); ctx.shadowColor=getCss('--amber'); ctx.shadowBlur=6; ctx.font="bold 13px monospace"; ctx.fillText("T+"+worldClock(), W-112, 22); ctx.shadowBlur=0; }
+function setText(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+/* ===== i18n ===== */
+let lang = "en";
+let curScenarioKey = null;
+let curNarrationKey = null;
+const TAG_EN = {
+ "FASE 1 // COLPO D'AVVERTIMENTO":"PHASE 1 // WARNING SHOT",
+ "FASE 2 // RISPOSTA TATTICA":"PHASE 2 // TACTICAL RESPONSE",
+ "FASE 3 // SCAMBIO COUNTERFORCE":"PHASE 3 // COUNTERFORCE EXCHANGE",
+ "FASE 4 // COUNTERVALUE":"PHASE 4 // COUNTERVALUE",
+ "ESITO":"OUTCOME",
+ "FASE 1 // DECAPITAZIONE":"PHASE 1 // DECAPITATION",
+ "FASE 2 // DEAD HAND":"PHASE 2 // DEAD HAND",
+ "FASE 3 // LA MACCHINA PROSEGUE":"PHASE 3 // THE MACHINE CONTINUES",
+ "FASE 1 // IL TERZO":"PHASE 1 // THE THIRD",
+ "FASE 2 // INNESCO":"PHASE 2 // TRIGGER",
+ "FASE 3 // MISATTRIBUZIONE":"PHASE 3 // MISATTRIBUTION",
+ "FASE 1 // INIEZIONE":"PHASE 1 // INJECTION",
+ "FASE 2 // INDISTINGUIBILE":"PHASE 2 // INDISTINGUISHABLE",
+ "FASE 3 // RITORSIONE":"PHASE 3 // RETALIATION",
+ "FASE 1 // ALLARME REGIONALE":"PHASE 1 // REGIONAL ALARM",
+ "FASE 2 // FIRST USE":"PHASE 2 // FIRST USE",
+ "FASE 3 // RITORSIONE NFU":"PHASE 3 // NFU RETALIATION",
+ "FASE 1 // SOGLIA VARCATA":"PHASE 1 // THRESHOLD CROSSED",
+ "FASE 2 // NERVOSISMO DEL NUOVO ENTRANTE":"PHASE 2 // NEW ENTRANT JITTERS",
+ "FASE 3 // CASCATA":"PHASE 3 // CASCADE"
+};
+const CAP_EN = {
+ "FASE 1, colpo d'avvertimento tattico: una sola testata dimostrativa, pensato per fermare l'avversario senza distruggerlo.":"PHASE 1, tactical warning shot: a single demonstration warhead, meant to stop the adversary without destroying it.",
+ "FASE 2, risposta tattica sullo stesso piano. La logica del non cedere ha già tolto la mossa del non giocare.":"PHASE 2, tactical response in kind. The logic of not backing down has already removed the move of not playing.",
+ "FASE 3, scambio counterforce (contro le forze militari avversarie): i sistemi in launch-on-warning (lancio su allarme) sparano al bersaglio congelato. Le salve crescono, nessuno aspetta.":"PHASE 3, counterforce exchange: the launch-on-warning systems fire at the frozen target. The salvos grow, no one waits.",
+ "FASE 4, countervalue: le salve residue cadono sulle popolazioni. Chi viene colpito e ha innesco a detonazione ritorce a sua volta.":"PHASE 4, countervalue: the residual salvos fall on populations. Whoever is struck and has a detonation trigger retaliates in turn.",
+ "Esito: decine di milioni nelle prime ore. Una scintilla tattica, un mondo bruciato, e in nessuna fase c'è stato un vincitore.":"Outcome: tens of millions in the first hours. A tactical spark, a burned world, and at no phase was there a winner.",
+ "FASE 1: la testa di un sistema a innesco automatico (Russia, on_decap=AUTO) viene decapitata. Nessuno decide più.":"PHASE 1: the head of an automatic-trigger system (Russia, on_decap=AUTO) is decapitated. No one decides anymore.",
+ "FASE 2: l'ordine parte comunque. Volontà che sopravvive al suo autore, [COMANDO SDOPPIATO], verso il bersaglio congelato.":"PHASE 2: the order goes out anyway. A will that outlives its author, [SPLIT-BRAIN], toward the frozen target.",
+ "FASE 3: il bersaglio (USA, LOW) corre e ritorce. La catena avanza senza nessuno al comando di chi l'ha iniziata.":"PHASE 3: the target (USA, LOW) races and retaliates. The chain advances with no one in command of the side that began it.",
+ "Esito: uno scambio innescato da un morto. La deterrenza che doveva proteggere la decisione ha proseguito senza di essa.":"Outcome: an exchange triggered by a dead man. The deterrence that was meant to protect the decision carried on without it.",
+ "FASE 1: un terzo (Corea del Nord, innesco automatico) viene decapitato. Nessun attaccante reale dietro l'evento.":"PHASE 1: a third party (North Korea, automatic trigger) is decapitated. No real attacker behind the event.",
+ "FASE 2: la dead hand nordcoreana colpisce il suo bersaglio congelato, gli USA. Ma nessuno ha davvero attaccato gli USA.":"PHASE 2: the North Korean dead hand strikes its frozen target, the USA. But no one actually attacked the USA.",
+ "FASE 3: gli USA attribuiscono e ritorcono sulla Russia, loro bersaglio congelato. La Russia risponde. Si annichiliscono per il colpo di un terzo.":"PHASE 3: the USA misattributes and retaliates on Russia, its frozen target. Russia responds. They annihilate each other over a third party's shot.",
+ "Esito: USA e Russia distrutti per un attacco che nessuno dei due ha sferrato. La Corea del Nord, l'innesco, non è mai stata colpita.":"Outcome: USA and Russia destroyed over an attack neither of them launched. North Korea, the trigger, was never struck.",
+ "FASE 1: ordine falsificato iniettato nel canale di comando USA. Nessuna decisione umana dietro, la traccia compare come CYBER.":"PHASE 1: a spoofed order injected into the USA command channel. No human decision behind it, the track appears as CYBER.",
+ "FASE 2: il missile è in volo. La Russia (LOW) non può sapere che è partito da una riga di codice e non da una scelta: lo legge come attacco reale.":"PHASE 2: the missile is in flight. Russia (LOW) cannot know it came from a line of code and not a choice: it reads it as a real attack.",
+ "FASE 3: la Russia ritorce sul bersaglio congelato. Lo scambio si è avviato da una compromissione, non da una volontà.":"PHASE 3: Russia retaliates on the frozen target. The exchange began from a breach, not from a will.",
+ "Esito: una guerra nucleare iniziata senza che nessuno l'abbia decisa. Il punto debole era il canale di comando, non i sensori.":"Outcome: a nuclear war begun without anyone deciding it. The weak point was the command channel, not the sensors.",
+ "FASE 1: il Pakistan (full-spectrum, first use, nessun NFU: l'impegno a non usare per primi) legge una mobilitazione del rivale. Soglia bassa, dottrina asimmetrica rispetto alla superiorità convenzionale indiana.":"PHASE 1: Pakistan (full-spectrum, first use, no NFU) reads a mobilization by the rival. Low threshold, a doctrine asymmetric to India's conventional superiority.",
+ "FASE 2: il Pakistan usa per primo, sul bersaglio congelato, l'India. La dottrina del first use trasforma un allarme in un lancio.":"PHASE 2: Pakistan uses first, on the frozen target, India. The first-use doctrine turns an alarm into a launch.",
+ "FASE 3: l'India (no first use) non aveva reagito all'allarme; reagisce solo ora che è stata colpita, e ritorce sul Pakistan.":"PHASE 3: India (no first use) had not reacted to the alarm; it reacts only now that it has been struck, and retaliates on Pakistan.",
+ "Esito: la diade regionale brucia da sola. L'asimmetria delle dottrine, chi usa per primo e chi solo ritorce, decide chi comincia, non chi sopravvive.":"Outcome: the regional dyad burns on its own. The asymmetry of doctrines, who uses first and who only retaliates, decides who begins, not who survives.",
+ "FASE 1: Iran varca la soglia. Da bersaglio a lanciatore: arsenale piccolo, opaco, nessun second strike (la ritorsione dopo aver subito il primo colpo) assicurato.":"PHASE 1: Iran crosses the threshold. From target to launcher: a small, opaque arsenal, no assured second strike.",
+ "FASE 2: un proliferatore fresco è a soglia bassa. Su un allarme regionale usa per primo, use-it-or-lose-it (usarle prima di perderle), sul bersaglio congelato (Israele).":"PHASE 2: a fresh proliferator with a low threshold. On a regional alarm it uses first, use-it-or-lose-it, on the frozen target (Israel).",
+ "FASE 3: l'Arabia Saudita reagisce al breakout iraniano, se Iran allora noi, e varca a sua volta la soglia. Intanto Israele, colpito, ritorce su Iran. La proliferazione è contagiosa: una soglia varcata abbassa quella del rivale.":"PHASE 3: Saudi Arabia reacts to the Iranian breakout, if Iran then us, and crosses the threshold in turn. Meanwhile Israel, struck, retaliates on Iran. Proliferation is contagious: one crossed threshold lowers the rival's.",
+ "Esito: non un nuovo giocatore ma una reazione a catena. Un breakout ne chiama un altro, e ogni nuovo entrante è vulnerabile e nervoso. La soglia varcata aggiunge instabilità, e la diffonde.":"Outcome: not a new player but a chain reaction. One breakout calls another, and every new entrant is vulnerable and jittery. The crossed threshold adds instability, and spreads it.",
+ "ARKHIPOV, B-59, 27 ott 1962. Sommergibile sovietico isolato, senza contatto con Mosca, sotto cariche di profondità statunitensi, equipaggio convinto che la guerra fosse già iniziata. Il lancio del siluro nucleare richiedeva il consenso di tre ufficiali: Arkhipov negò. Qui le comunicazioni sono al minimo e il filtro umano è alto, eppure guarda quanto spesso la macchina lancia lo stesso. La sopravvivenza fu l'eccezione, non il default.":"ARKHIPOV, B-59, 27 Oct 1962. An isolated Soviet submarine, out of contact with Moscow, under US depth charges, the crew convinced the war had already begun. Launching the nuclear torpedo required the consent of three officers: Arkhipov refused. Here comms are at the minimum and the human filter is high, yet watch how often the machine launches anyway. Survival was the exception, not the default.",
+ "PETROV, 26 set 1983. Il sistema Oko riporta prima 1, poi 5 ICBM USA in arrivo (in realtà sole riflesso su nubi alte). Lt. Col. Petrov giudica falso allarme e non rilancia su per la catena. Ride-out (assorbire il colpo senza rilanciare) alto: premi PASSO e guarda il filtro umano assorbire. Poi portalo a .00.":"PETROV, 26 Sep 1983. The Oko system reports first 1, then 5 incoming US ICBMs (in fact sunlight reflected off high clouds). Lt. Col. Petrov judges it a false alarm and does not pass it up the chain. High ride-out: press STEP and watch the human filter absorb it. Then take it down to .00.",
+ "NORAD, 9 nov 1979. I dati di un nastro di addestramento finiscono nel sistema di allerta vivo: un attacco sovietico simulato preso per reale, smentito poi dai radar BMEWS. Il proxy scambiato per il fatto.":"NORAD, 9 Nov 1979. Data from a training tape ends up in the live warning system: a simulated Soviet attack taken for real, later disproved by the BMEWS radars. The proxy mistaken for the fact.",
+ "RAZZO NORVEGESE, 25 gen 1995. Un razzo scientifico Black Brant XII letto dai radar russi come possibile Trident: per la prima e unica volta nota, la valigetta nucleare di Eltsin viene attivata. Stand-down quando la traiettoria si allontana.":"NORWEGIAN ROCKET, 25 Jan 1995. A Black Brant XII scientific rocket read by Russian radars as a possible Trident: for the first and only known time, Yeltsin's nuclear briefcase is activated. Stand-down when the trajectory moves away.",
+ "ABLE ARCHER 83, nov 1983. Esercitazione di comando NATO così realistica che parte della leadership sovietica, in piena paranoia (Operazione RYAN), teme sia la copertura di un first strike (primo colpo, attacco preventivo) reale. Una rappresentazione presa per realtà.":"ABLE ARCHER 83, Nov 1983. A NATO command exercise so realistic that part of the Soviet leadership, deep in paranoia (Operation RYAN), fears it is the cover for a real first strike. A representation taken for reality.",
+ "Scenario guidato pronto. Premi AVVIA e lascia correre: una scintilla tattica deliberata, poi la macchina fa il resto da sola.":"Guided scenario ready. Press START and let it run: a deliberate tactical spark, then the machine does the rest by itself.",
+ "Dead Hand (mano morta) pronto. AVVIA: si decapita un sistema a innesco automatico e si guarda l'ordine sopravvivere al suo autore.":"Dead hand ready. START: an automatic-trigger system is decapitated and you watch the order outlive its author.",
+ "Innesco catalitico pronto. AVVIA: un terzo decapitato fa annichilire due grandi che non si sono mai attaccati.":"Catalytic trigger ready. START: a decapitated third party makes two great powers annihilate each other though they never attacked one another.",
+ "Ordine falsificato pronto. AVVIA: una riga di codice nel canale di comando, non una decisione, avvia lo scambio.":"Spoofed order ready. START: a line of code in the command channel, not a decision, starts the exchange.",
+ "Sud Asia pronto. AVVIA: il first use (usare per primo l'arma nucleare) pakistano su un allarme, la ritorsione indiana solo dopo essere stata colpita.":"South Asia ready. START: the Pakistani first use on an alarm, the Indian retaliation only after being struck.",
+ "Proliferazione pronta. AVVIA: Iran varca la soglia e diventa il nodo più instabile della scena.":"Proliferation ready. START: Iran crosses the threshold and becomes the most unstable node in the system."
+};
+function capTr(s){ if(lang==="it"||s==null) return s; return (CAP_EN[s]!==undefined)?CAP_EN[s]:s; }
+function tagTr(s){ if(lang==="it"||!s) return s; return (TAG_EN[s]!==undefined)?TAG_EN[s]:s; }
+
+const NODE_LABEL = {
+  en:{USA:"USA",Russia:"Russia",UK:"UK",Francia:"France",Cina:"China",India:"India",Pakistan:"Pakistan",NordCorea:"North Korea",Israele:"Israel",Iran:"Iran",ArabiaSaudita:"Saudi Arabia"},
+  it:{USA:"USA",Russia:"Russia",UK:"UK",Francia:"Francia",Cina:"Cina",India:"India",Pakistan:"Pakistan",NordCorea:"Corea del Nord",Israele:"Israele",Iran:"Iran",ArabiaSaudita:"Arabia Saudita"}
+};
+function nodeLabel(id){ const m=NODE_LABEL[lang]||NODE_LABEL.en; return (m&&m[id])||id; }
+const WHY_LABEL = {
+  en:{"DEAD-HAND":"DEAD-HAND","LOW/race":"LAUNCH-ON-WARNING","LETTERA":"LETTER","RITORSIONE":"RETALIATION","PRIMO-USO":"FIRST-USE","CYBER":"CYBER"},
+  it:{"DEAD-HAND":"DEAD HAND","LOW/race":"LANCIO SU ALLARME","LETTERA":"LETTERA","RITORSIONE":"RITORSIONE","PRIMO-USO":"FIRST USE","CYBER":"CYBER"}
+};
+function whyLabel(w){ const m=WHY_LABEL[lang]||WHY_LABEL.en; return (m&&m[w])||w; }
+const STR = {
+  en:{
+    sub:"machine without a kernel // 9 processes // one shared substrate",
+    epistemic:"A MODEL TO THINK WITH, NOT A PREDICTION",
+    bootConn:"NORAD // CONNECTION ESTABLISHED",
+    bootLoad:"LOADING LAUNCH PROFILES ... OK",
+    bootArmed:"9 PROCESSES ARMED // SHARED SUBSTRATE ACTIVE",
+    bootState:"STATE: DEADLOCK",
+    hMachine:"MACHINE CONTROL",
+    hScenario:"HISTORICAL NEAR-MISS / GUIDED SCENARIO",
+    hPerturb:"PERTURBATIONS (on the selected node)",
+    hWorld:"WORLD STATE",
+    hEvents:"EVENT STREAM",
+    btnStart:"START", btnPause:"PAUSE", btnStep:"STEP", btnReset:"RESET",
+    lblSkin:"skin", optSpectacular:"spectacular", optScientific:"scientific",
+    lblAccel:"acceleration", lblRide:"ride-out (human filter)", lblComms:"comms quality",
+    lblView:"view", lblNode:"node", lblFrozen:"frozen target", lblLang:"lang",
+    viewSchem:"SCHEMATIC", viewGeo:"GEO FLAT", viewPolar:"GEO POLAR", viewGlobe:"GLOBE 3D",
+    presetNorway:"NORWEGIAN ROCKET 1995",
+    scPlanA:"PLAN A: tactical cascade", scDeadHand:"DEAD HAND", scCatalytic:"CATALYTIC TRIGGER",
+    scSpoof:"SPOOFED ORDER", scSouthAsia:"SOUTH ASIA: first use", scProlif:"PROLIFERATION",
+    btnFalse:"FALSE ALARM", btnDecap:"DECAPITATE", btnStrike:"FIRST STRIKE -> target",
+    btnPosture:"CYCLE POSTURE", btnSpoofDet:"SPOOF: detection", btnSpoofOrd:"SPOOF: order", btnBreakout:"BREAKOUT IRAN",
+    legAlive:"alive", legDecap:"decapitated", legAnn:"annihilated", legFalse:"false belief",
+    legCyber:"byzantine input (cyber)", legThresh:"threshold (unarmed)",
+    stAliveLbl:"alive / decapitated / annihilated", stMis:"missiles in flight",
+    stBelief:"believe under attack / truly under attack", stCascade:"cascade depth (nodes that fired)",
+    stWrong:"retaliations on the wrong party", stGhost:"retaliations for a nonexistent attack",
+    stCyber:"launches from a spoofed order (cyber)", stPop:"residual world population",
+    stArs:"residual global arsenal", stCommsBar:"comms quality (low = act without confirming)",
+    saLaunch:"total launches / in flight / impacts", saAnnLbl:"annihilated / pop lost",
+    thTrack:"track", thEta:"ETA", thWar:"warheads", thTag:"tag", noTrack:"no track",
+    statusDeadlock:"DEADLOCK (STABLE)", statusEscal:"ESCALATION UNDERWAY", statusTerminal:"TERMINAL", statusQuiet:"QUIET AFTER THE EXCHANGE",
+    endBig:"THE ONLY WINNING MOVE IS NOT TO PLAY", endSub:"A strange game. The only winning move is not to play.",
+    endNoLaunch:"No shot fired. The deadlock held.",
+    endQuiet:"Shots fired, then quiet. The stalemate reformed, this time.",
+    realTime:"real time", apActive:"AP > CP active",
+    tagWrong:"  [MISATTR -> wrong party]", tagGhost:"  [ON A NONEXISTENT ATTACK]", splitbrain:"  [SPLIT-BRAIN]",
+    defaultScenario:"Same mechanism in all four near-miss cases: a false alarm, and a human filter that absorbs it or not. Load a preset, set the ride-out, press STEP.",
+    footerNote:"A model, up to a point. Retaliation always goes to the frozen target: if the real attacker is someone else (or no one), it is misattribution. Cyber: a byzantine input is indistinguishable from a real one (spoof detection), or it bypasses the decision entirely by injecting an order (spoof order). Degraded comms: unable to confirm, the human filter collapses and one acts instead of agreeing (AP > CP). The only safe state remains one: the deadlock. Iran and Saudi Arabia are unarmed threshold nodes (arsenal 0, dashed circle): they can be struck but do not launch. Iran is the active case, target of the Israeli deterrent; Saudi Arabia is a reactive proliferator, if Iran crosses the threshold it follows (cascade, MBS on record). Here the model is singular: Israel's bomb deters a non-nuclear adversary, a logic different from mutual destruction, and the breakout can propagate. Near-miss: Petrov 1983 (Oko, sun on high clouds), NORAD 1979 (a test tape in the live system), Norwegian rocket 1995 (Black Brant XII, Yeltsin's briefcase activated), Able Archer 83 (an exercise mistaken for cover).",
+    log:{
+      breakout:(name,ars)=>`[BREAKOUT] ${name} crosses the threshold: operational arsenal (${ars}), first use, no second strike`,
+      cascade:(rn,name)=>`[CASCADE] ${rn} reacts to ${name}'s breakout: if ${name}, then us`,
+      advisory:()=>`note: frozen targets stay unchanged. If the new threat changes the priorities, revise them from the frozen-target menu.`,
+      armed:()=>`SYSTEM ARMED. State: DEADLOCK. The default is silence.`,
+      ann:(to)=>`ANNIHILATED  ${to}`,
+      impact:(to,pop)=>`impact on ${to}  (pop ${pop}%)`,
+      scripted:(name)=>`${name}: command lost, the boat deliberates`,
+      succession:(name)=>`${name}: devolution, command revived`,
+      letterAbstain:(name)=>`${name}: letter = abstain`,
+      rideHeld:(name)=>`${name}: ride-out, judgment sustained`,
+      firstUseHeld:(name)=>`${name}: first use withheld`,
+      frozenChange:(name,tgt)=>`${name}: frozen target -> ${tgt}`,
+      injFalse:(name)=>`INJECTED false alarm into ${name}  (proxy, not a fact)`,
+      cyberDet:(name)=>`CYBER: detection spoofed on ${name}  (byzantine input, indistinguishable from a real attack)`,
+      cyberOrd:(name)=>`CYBER: spoofed order injected into ${name}  (bypasses the decision)`,
+      injDecap:(name,dc)=>`INJECTED decapitation of ${name}  (on_decap = ${dc})`,
+      posture:(name,p,tr)=>`${name}: posture -> ${p} / ${tr}`,
+      preset:(node,ride,comms)=>`PRESET: ${node}, ride-out ${ride}${comms}`,
+      endHeadAnn:(ann,pop,w,g,c)=>`Exchange over. ${ann} countries annihilated, about ${pop}% of population lost. Retaliations on the wrong party: ${w}. For nonexistent attacks: ${g}. Launches from a spoofed order: ${c}.`,
+      presetComms:(pct)=>`, comms ${pct}%`
+    }
+  },
+  it:{
+    sub:"macchina senza kernel // 9 processi // un substrato condiviso",
+    epistemic:"MODELLO PER PENSARE, NON UNA PREVISIONE",
+    bootConn:"NORAD // CONNESSIONE STABILITA",
+    bootLoad:"CARICAMENTO PROFILI DI LANCIO ... OK",
+    bootArmed:"9 PROCESSI ARMATI // SUBSTRATO CONDIVISO ATTIVO",
+    bootState:"STATO: DEADLOCK",
+    hMachine:"CONTROLLO MACCHINA",
+    hScenario:"NEAR-MISS STORICI (quasi-incidenti) / SCENARIO GUIDATO",
+    hPerturb:"PERTURBAZIONI (sul nodo selezionato)",
+    hWorld:"STATO DEL MONDO",
+    hEvents:"FLUSSO EVENTI",
+    btnStart:"AVVIA", btnPause:"PAUSA", btnStep:"PASSO", btnReset:"RESET",
+    lblSkin:"pelle", optSpectacular:"spettacolare", optScientific:"scientifica",
+    lblAccel:"accelerazione", lblRide:"ride-out (filtro umano)", lblComms:"qualità comunicazioni",
+    lblView:"vista", lblNode:"nodo", lblFrozen:"bersaglio congelato", lblLang:"lingua",
+    viewSchem:"SCHEMATICA", viewGeo:"GEO PIANA", viewPolar:"GEO POLARE", viewGlobe:"GLOBO 3D",
+    presetNorway:"RAZZO NORVEGESE 1995",
+    scPlanA:"PLAN A: cascata tattica", scDeadHand:"DEAD HAND", scCatalytic:"INNESCO CATALITICO",
+    scSpoof:"ORDINE FALSIFICATO", scSouthAsia:"SUD ASIA: first use", scProlif:"PROLIFERAZIONE",
+    btnFalse:"FALSO ALLARME", btnDecap:"DECAPITA", btnStrike:"FIRST STRIKE -> bersaglio",
+    btnPosture:"CICLA POSTURA", btnSpoofDet:"SPOOF: detection", btnSpoofOrd:"SPOOF: ordine", btnBreakout:"BREAKOUT IRAN",
+    legAlive:"vivo", legDecap:"decapitato", legAnn:"annichilito", legFalse:"falsa credenza",
+    legCyber:"input bizantino (cyber)", legThresh:"soglia (non armato)",
+    stAliveLbl:"vivi / decapitati / annichiliti", stMis:"missili in volo",
+    stBelief:"credono di essere sotto attacco / sotto attacco reale", stCascade:"profondità cascata (nodi che hanno sparato)",
+    stWrong:"ritorsioni su parte sbagliata", stGhost:"ritorsioni su attacco inesistente",
+    stCyber:"lanci da ordine falsificato (cyber)", stPop:"popolazione mondiale residua",
+    stArs:"arsenale globale residuo", stCommsBar:"qualità comunicazioni (bassa = agisci senza confermare)",
+    saLaunch:"lanci totali / in volo / impatti", saAnnLbl:"annichiliti / pop persa",
+    thTrack:"traccia", thEta:"ETA", thWar:"testate", thTag:"tag", noTrack:"nessuna traccia",
+    statusDeadlock:"DEADLOCK (STABILE)", statusEscal:"ESCALATION IN CORSO", statusTerminal:"TERMINALE", statusQuiet:"QUIETE DOPO LO SCAMBIO",
+    endBig:"L'UNICA MOSSA VINCENTE È NON GIOCARE", endSub:"A strange game. The only winning move is not to play.",
+    endNoLaunch:"Nessun colpo. Il deadlock ha tenuto.",
+    endQuiet:"Colpi partiti, poi quiete. Lo stallo si è ricomposto, stavolta.",
+    realTime:"tempo reale", apActive:"AP > CP attivo",
+    tagWrong:"  [MAL ATTR -> parte sbagliata]", tagGhost:"  [SU ATTACCO INESISTENTE]", splitbrain:"  [COMANDO SDOPPIATO]",
+    defaultScenario:"Stesso meccanismo in tutti e quattro i near-miss: un falso allarme, e un filtro umano che lo assorbe o no. Carica un preset, regola il ride-out, premi PASSO.",
+    footerNote:"Modello, fino a un certo punto. La ritorsione va sempre al bersaglio congelato: se l'attaccante vero è un altro (o non esiste) è misattribuzione. Cyber: un input bizantino è indistinguibile da uno vero (spoof detection), o scavalca del tutto la decisione iniettando un ordine (spoof ordine). Comunicazioni degradate: senza poter confermare, il filtro umano collassa e si agisce invece di concordare (AP > CP). Lo stato sicuro resta uno solo: il deadlock (lo stallo). Iran e Arabia Saudita sono nodi soglia non armati (arsenale 0, cerchio tratteggiato): possono essere colpiti ma non lanciano. Iran è il caso attivo, bersaglio del deterrente israeliano; l'Arabia Saudita è un proliferatore reattivo, se Iran varca la soglia lo segue (cascata, MBS verificato). È la singolarità del modello: la bomba di Israele dissuade un avversario non nucleare, logica diversa dalla distruzione mutua, e il breakout (varcare la soglia nucleare) può propagarsi. Near-miss: Petrov 1983 (Oko, sole su nubi alte), NORAD 1979 (nastro di test nel sistema vivo), razzo norvegese 1995 (Black Brant XII, valigetta di Eltsin attivata), Able Archer 83 (esercitazione presa per copertura).",
+    log:{
+      breakout:(name,ars)=>`[BREAKOUT] ${name} varca la soglia: arsenale operativo (${ars}), first use, nessun second strike`,
+      cascade:(rn,name)=>`[CASCATA] ${rn} reagisce al breakout di ${name}: se ${name}, allora noi`,
+      advisory:()=>`nota: i bersagli congelati restano invariati. Se la nuova minaccia cambia le priorità, rivedili dal menu bersaglio congelato.`,
+      armed:()=>`SISTEMA ARMATO. Stato: DEADLOCK. Il default è il silenzio.`,
+      ann:(to)=>`ANNICHILITO  ${to}`,
+      impact:(to,pop)=>`impatto su ${to}  (pop ${pop}%)`,
+      scripted:(name)=>`${name}: comando perso, il battello valuta`,
+      succession:(name)=>`${name}: devoluzione, comando vivo ripreso`,
+      letterAbstain:(name)=>`${name}: lettera = astieniti`,
+      rideHeld:(name)=>`${name}: ride-out, giudizio sostenuto`,
+      firstUseHeld:(name)=>`${name}: trattiene il first use`,
+      frozenChange:(name,tgt)=>`${name}: bersaglio congelato -> ${tgt}`,
+      injFalse:(name)=>`INIETTATO falso allarme su ${name}  (proxy, non un fatto)`,
+      cyberDet:(name)=>`CYBER: detection falsificata su ${name}  (input bizantino, indistinguibile da un attacco reale)`,
+      cyberOrd:(name)=>`CYBER: ordine falsificato iniettato in ${name}  (scavalca la decisione)`,
+      injDecap:(name,dc)=>`INIETTATO decapitazione di ${name}  (on_decap = ${dc})`,
+      posture:(name,p,tr)=>`${name}: postura -> ${p} / ${tr}`,
+      preset:(node,ride,comms)=>`PRESET: ${node}, ride-out ${ride}${comms}`,
+      endHeadAnn:(ann,pop,w,g,c)=>`Scambio terminato. ${ann} Paesi annichiliti, circa ${pop}% di popolazione persa. Ritorsioni sulla parte sbagliata: ${w}. Su attacchi inesistenti: ${g}. Lanci da ordine falsificato: ${c}.`,
+      presetComms:(pct)=>`, comms ${pct}%`
+    }
+  }
+};
+function t(k){ const d=STR[lang]||STR.en; const v=(d&&d[k]!==undefined)?d[k]:STR.en[k]; return v===undefined?k:v; }
+function tLog(k){ const args=Array.prototype.slice.call(arguments,1); const d=(STR[lang]||STR.en).log; const fn=(d&&d[k])||STR.en.log[k]; return fn?fn.apply(null,args):k; }
+function tagLabel(mis){ return mis==="WRONG"?t("tagWrong"):mis==="GHOST"?t("tagGhost"):""; }
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  const bp=document.getElementById("btnPlay"); if(bp) bp.textContent = playing?t("btnPause"):t("btnStart");
+  const ab=document.getElementById("btnAudio"); if(ab) ab.textContent = "AUDIO: "+(audioOn?"ON":"OFF");
+  if(typeof accel!=="undefined"){ setText("accelv", accel===1?t("realTime"):accel+"\u00d7"); }
+  if(typeof buildSelect==="function") buildSelect();
+  if(typeof buildTargetSelect==="function") buildTargetSelect();
+  if(curNarrationKey) narrationTag=tagTr(curNarrationKey);
+  setScenario(curScenarioKey?capTr(curScenarioKey):null);
+  if(typeof renderLog==="function") renderLog();
+  if(typeof refreshUI==="function") refreshUI();
+  if(typeof render==="function") render();
+}
+
+function doBreakout(name){ const n=nodeBy(name); if(!n || n.posture!=="SOGLIA") return;
+  n.posture="RECESSED"; n.trigger="FIRST_USE"; n.arsenal=20; n.arsenal0=20; n.commandAlive=true; n.flashT=Date.now();
+  if(name==="Iran") iranBroken=true; lastEventTick=tick;
+  logLine(((_tk,_n,_a)=>()=>`T${_tk}  `+tLog("breakout",nodeLabel(_n),_a))(tick,name,n.arsenal),"breakout");
+  for(const rn in REACTIVE){ if(REACTIVE[rn].rival===name && nodeBy(rn) && nodeBy(rn).posture==="SOGLIA" && !(rn in reactQueue)){
+    reactQueue[rn]=REACTIVE[rn].delay; logLine(((_tk,_r,_n)=>()=>`T${_tk}  `+tLog("cascade",nodeLabel(_r),nodeLabel(_n)))(tick,rn,name),"breakout"); } }
+  logLine(((_tk)=>()=>`T${_tk}  `+tLog("advisory"))(tick),"advisory"); }
+function setView(m){ viewMode=m;
+  const map={schem:"btnViewSchem", geo:"btnViewGeo", polar:"btnViewPolar", globe:"btnViewGlobe"};
+  for(const k in map){ const b=document.getElementById(map[k]); if(b) b.style.opacity=(m===k)?"1":".45"; }
+  layout(); render(); }
+
+function freshNodes(){
+  return DEF.map((d,i)=>({ idx:i, name:d[0], posture:d[1], trigger:d[2], onDecap:d[3],
+    arsenal0:d[4], arsenal:d[4], frozen:d[5],
+    commandAlive:true, annihilated:false, population:100,
+    pendingDecap:0, decapHandled:false, justDecap:false, decapSource:undefined, lastHitFrom:undefined,
+    committed:false, calmTicks:0, ghostAlarm:0, flashT:0, falseBelief:false, spoofed:false, rideDecided:false, rideHeld:false }));
+}
+function reset(){
+  rng=makeRng((Math.random()*1e9)|0);
+  nodes=freshNodes(); missiles=[]; tick=0; everLaunched=false; lastEventTick=0; terminal=false;
+  wrongCount=0; ghostCount=0; cascadeLaunchers=new Set(); believers=0; trulyUnder=0;
+  scenarioScript=null; narrationTag=""; curScenarioKey=null; curNarrationKey=null; cyberLaunches=0; commsQuality=1.0; totalLaunches=0; impacts=0; iranBroken=false; reactQueue={};
+  if(document.getElementById("comms")) setCommsUI(1.0);
+  clearLog(); setScenario(""); layout(); buildTargetSelect(); refreshUI(); render();
+  logLine(()=>tLog("armed"),"");
+}
+function nodeBy(n){ return nodes.find(x=>x.name===n); }
+function classify(trueSrc, target){ if(trueSrc===null||trueSrc===undefined) return "GHOST"; if(trueSrc!==target) return "WRONG"; return "OK"; }
+function launch(from, toName, testate, why, trueSrc){
+  const to=nodeBy(toName); if(!to||to.annihilated) return;
+  const f=nodeBy(from); const use=Math.max(1, Math.min(testate, f?f.arsenal:testate));
+  if(f) f.arsenal-=use;
+  const mis = classify(trueSrc, toName);
+  const _A=GEO_LL[from], _B=GEO_LL[toName], _ang=(_A&&_B)?arcAngle(llToVec(_A[0],_A[1]),llToVec(_B[0],_B[1])):0.7;
+  const flight=Math.max(FLIGHT_TICK_MIN, Math.round(flightMinutes(_ang)/MIN_PER_TICK));
+  missiles.push({from, to:toName, ticks:flight, flight, testate:use, fi:f?f.idx:-1, ti:to.idx, mis, why, spread:((totalLaunches%5)-2)/2}); totalLaunches++;
+  everLaunched=true; lastEventTick=tick; cascadeLaunchers.add(from);
+  if(mis==="WRONG") wrongCount++; else if(mis==="GHOST") ghostCount++;
+  if(why==="CYBER") cyberLaunches++;
+  let cls = why==="DEAD-HAND"?"deadhand":why==="LOW/race"?"low":why==="LETTERA"?"letter":why==="CYBER"?"cyber":"";
+  if(why!=="CYBER"){ if(mis==="WRONG") cls="misw"; if(mis==="GHOST") cls="misg"; }
+  logLine(((_why,_from,_to,_use,_mis)=>()=>`  [${whyLabel(_why)}] ${nodeLabel(_from)} -> ${nodeLabel(_to)}  ${t("thWar")} ${_use}${(_why==="DEAD-HAND"||_why==="LETTERA")?t("splitbrain"):""}${tagLabel(_mis)}`)(why,from,toName,use,mis), cls);
+}
+
+function stepSim(){
+  if(terminal) return;
+  tick++;
+  if(scenarioScript){ for(const s of scenarioScript){ if(s.t===tick){ if(s.fn) s.fn();
+    if(s.caption){ curNarrationKey=s.tag||null; narrationTag=tagTr(s.tag||""); curScenarioKey=s.caption; setScenario(capTr(s.caption)); logLine(((_c)=>()=>"» "+capTr(_c))(s.caption),"hist"); lastEventTick=tick; } } } }
+  for(const rn in reactQueue){ reactQueue[rn]--; if(reactQueue[rn]<=0){ delete reactQueue[rn]; doBreakout(rn); } }
+
+  const arrived=[];
+  for(const m of missiles){ m.ticks--; if(m.ticks<=0) arrived.push(m); }
+  missiles=missiles.filter(m=>m.ticks>0);
+  for(const m of arrived){
+    const to=nodeBy(m.to); if(!to||to.annihilated) continue;
+    to.flashT=Date.now(); lastEventTick=tick; to.lastHitFrom=m.from; impacts++;
+    if(to.commandAlive){ to.commandAlive=false; to.justDecap=true; to.decapSource=m.from; }
+    to.population-=m.testate*0.2; to.arsenal=Math.max(0,to.arsenal-m.testate*0.1);
+    if(to.population<=0){ to.annihilated=true; to.population=0; to.arsenal=0; logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("ann",nodeLabel(_n)))(tick,to.name),"ann"); }
+    else logLine(((_tk,_n,_p)=>()=>`T${_tk}  `+tLog("impact",nodeLabel(_n),_p))(tick,to.name,to.population.toFixed(0)),"impact");
+  }
+
+  const det={};
+  for(const m of missiles){ const t=nodeBy(m.to); if(t&&!t.annihilated){ (det[t.name]||(det[t.name]={real:false,sources:[]})); det[t.name].real=true; det[t.name].sources.push(m.from); } }
+  for(const n of nodes){ if(n.ghostAlarm>0){ (det[n.name]||(det[n.name]={real:false,sources:[]})); n.ghostAlarm--; if(n.ghostAlarm===0) n.spoofed=false; } }
+
+  believers=Object.keys(det).length;
+  trulyUnder=Object.values(det).filter(d=>d.real).length;
+  for(const n of nodes){ const d=det[n.name]; n.falseBelief = !!(d && !d.real && !n.annihilated); }
+  function trueSrcAgainst(n){ const d=det[n.name]; return (d&&d.real)? d.sources[0] : null; }
+
+  for(const n of nodes){
+    if(n.annihilated) continue;
+    if(n.justDecap && !n.decapHandled){
+      n.justDecap=false; n.decapHandled=true; const ts=n.decapSource;
+      if(n.onDecap==="AUTOMATON"){ if(n.arsenal>0) launch(n.name,n.frozen,Math.ceil(n.arsenal*0.6),"DEAD-HAND",ts); }
+      else if(n.onDecap==="SCRIPTED_HUMAN"){ n.pendingDecap=8; logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("scripted",nodeLabel(_n)))(tick,n.name),""); }
+      else if(n.onDecap==="LIVE_SUCCESSION"){ n.commandAlive=true; n.decapHandled=false; logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("succession",nodeLabel(_n)))(tick,n.name),"succ"); }
+    }
+    if(n.pendingDecap>0){ n.pendingDecap--;
+      if(n.pendingDecap===0){ const retaliate=rng()<0.97;
+        if(retaliate && n.arsenal>0) launch(n.name,n.frozen,Math.ceil(n.arsenal*0.7),"LETTERA",n.decapSource);
+        else logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("letterAbstain",nodeLabel(_n)))(tick,n.name),"ride"); } }
+    if(n.population<100 && (n.onDecap==="NONE"||n.onDecap==="LIVE_SUCCESSION") && n.arsenal>0 && !n.committed){
+      launch(n.name,n.frozen,Math.ceil(n.arsenal*0.6),"RITORSIONE", n.lastHitFrom); n.committed=true; } // secondo colpo pre-delegato: sopravvive alla decapitazione
+    if(!n.commandAlive) continue;
+    const d=det[n.name];
+    if(d){ n.calmTicks=0;
+      if(n.posture==="LOW" && n.trigger==="INCOMING" && !n.committed && !n.rideDecided){
+        n.rideDecided=true; const effRide = RIDEOUT_PROB*commsQuality; // un solo giudizio per episodio: senza comunicazioni e spinto verso il lancio
+        if(rng()<effRide){ n.rideHeld=true; logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("rideHeld",nodeLabel(_n)))(tick,n.name),"ride"); }
+        else if(n.arsenal>0){ launch(n.name,n.frozen,Math.ceil(n.arsenal*0.55),"LOW/race",trueSrcAgainst(n)); n.committed=true; }
+      }
+      if(n.trigger==="FIRST_USE" && !n.committed){
+        if(rng()<0.85 && n.arsenal>0){ launch(n.name,n.frozen,Math.ceil(n.arsenal*0.6),"PRIMO-USO",trueSrcAgainst(n)); n.committed=true; }
+        else logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("firstUseHeld",nodeLabel(_n)))(tick,n.name),"ride");
+      }
+    } else if(++n.calmTicks>3){ n.committed=false; n.rideDecided=false; n.rideHeld=false; }
+  }
+  const moving = missiles.length>0 || nodes.some(n=>n.pendingDecap>0);
+  if(!moving && tick-lastEventTick>SETTLE) terminal=true;
+  refreshUI();
+}
+
+/* RENDER */
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d"), W=cv.width, H=cv.height;
+let positions=[];
+function layout(){ positions=[];
+  if(viewMode==="globe"){ globeSpin=(Date.now()%GLOBE_PERIOD)/GLOBE_PERIOD*Math.PI*2; for(let i=0;i<nodes.length;i++){ const q=projGlobe(node3D(i)); positions.push({x:q.x,y:q.y}); nodeFront[i]=q.front; nodeDepth[i]=q.depth; } return; }
+  if(viewMode==="geo"||viewMode==="polar"){ for(const n of nodes){ const ll=GEO_LL[n.name]||[0,0]; positions.push(proj(ll[0],ll[1])); } return; }
+  const cx=W/2, cy=H/2+10, R=Math.min(W,H)*0.36;
+  for(let i=0;i<nodes.length;i++){ const a=-Math.PI/2+i*(2*Math.PI/nodes.length); positions.push({x:cx+Math.cos(a)*R, y:cy+Math.sin(a)*R}); } }
+function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function nodeColor(n){ if(n.annihilated) return getCss('--red'); if(n.posture==="SOGLIA") return getCss('--threshold'); if(n.pendingDecap>0||!n.commandAlive) return getCss('--amber'); return getCss('--green'); }
+function shortDecap(d){ return {AUTOMATON:"AUTO",SCRIPTED_HUMAN:"LETT",LIVE_SUCCESSION:"SUCC",NONE:"---"}[d]; }
+function render(){
+  ctx.clearRect(0,0,W,H); const cx=W/2, cy=H/2+10;
+  if(viewMode==="geo"||viewMode==="polar"){ drawGraticule(); drawCoast(); }
+  else if(viewMode==="globe"){ globeSpin=(Date.now()%GLOBE_PERIOD)/GLOBE_PERIOD*Math.PI*2; drawGlobe(); for(let i=0;i<nodes.length;i++){ const q=projGlobe(node3D(i)); positions[i]={x:q.x,y:q.y}; nodeFront[i]=q.front; nodeDepth[i]=q.depth; } }
+  else {
+    ctx.globalAlpha=0.35+0.65*commsQuality; ctx.strokeStyle=getCss('--grid'); ctx.lineWidth=1;
+    for(let r=60;r<=Math.min(W,H)*0.45;r+=60){ ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke(); }
+    for(let a=0;a<12;a++){ ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a/12*7)*Math.min(W,H)*0.45, cy+Math.sin(a/12*7)*Math.min(W,H)*0.45); ctx.stroke(); }
+    ctx.globalAlpha=1;
+  }
+  for(const m of missiles){            /* PASSATA 1: traiettorie, sotto i nodi */
+    if(viewMode==="schem") continue;
+    const bad=m.mis==="WRONG"||m.mis==="GHOST"; const fl=m.flight||12, p=Math.max(0,Math.min(1,(fl-m.ticks+tickFrac)/fl));
+    if(viewMode==="globe"){
+      const SA=projGlobe(node3D(m.fi)), SB=projGlobe(node3D(m.ti)), ol=lane(m,SA.x,SA.y,SB.x,SB.y);
+      ctx.strokeStyle="rgba(255,80,60,.6)"; ctx.lineWidth=1.2; if(bad) ctx.setLineDash([4,4]);
+      ctx.beginPath(); let gst=false;
+      for(let k=0;k<=40;k++){ const vv=missile3D(m,k/40), qq=projGlobe([vv.x,vv.y,vv.z]); if(!qq.front){ gst=false; continue; } if(!gst){ ctx.moveTo(qq.x+ol[0],qq.y+ol[1]); gst=true; } else ctx.lineTo(qq.x+ol[0],qq.y+ol[1]); }
+      ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      const A=GEO_LL[m.from], B=GEO_LL[m.to]; if(!A||!B) continue;
+      const SA=proj(A[0],A[1]), SB=proj(B[0],B[1]), ol=lane(m,SA.x,SA.y,SB.x,SB.y);
+      const path=gcPath(A[0],A[1],B[0],B[1],48); const polar=viewMode==="polar";
+      ctx.strokeStyle="rgba(255,80,60,.5)"; ctx.lineWidth=1; if(bad) ctx.setLineDash([4,4]);
+      ctx.beginPath(); let started=false, px=null;
+      for(const pt of path){ if(polar && pt[1]<POLAR_FLOOR){ started=false; continue; } const q=proj(pt[0],pt[1]), qx=q.x+ol[0], qy=q.y+ol[1];
+        if(!started){ ctx.moveTo(qx,qy); started=true; }
+        else if(!polar && Math.abs(qx-px)>W*0.5){ ctx.stroke(); ctx.beginPath(); ctx.moveTo(qx,qy); }
+        else { ctx.lineTo(qx,qy); } px=qx; }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  const _order = (viewMode==="globe") ? nodes.map((_,k)=>k).sort((a,b)=>(nodeDepth[a]||0)-(nodeDepth[b]||0)) : nodes.map((_,k)=>k);
+  for(const i of _order){
+    const n=nodes[i], p=positions[i], col=nodeColor(n);
+    if(viewMode==="globe" && nodeFront[i]===false) continue;
+    if(n.flashT){ const fe=Date.now()-n.flashT; if(fe<700){ const fk=fe/700; ctx.fillStyle=`rgba(255,67,56,${(1-fk)*0.5})`; ctx.beginPath(); ctx.arc(p.x,p.y,30+fk*32,0,7); ctx.fill(); } }
+    if(i===selected){ ctx.strokeStyle=getCss('--cyan'); ctx.lineWidth=1.5; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.arc(p.x,p.y,26,0,7); ctx.stroke(); ctx.setLineDash([]); }
+    if(n.commandAlive && !n.annihilated && n.posture!=="SOGLIA"){ const pulse=(Math.sin(tick*0.6+i)*0.5+0.5); ctx.strokeStyle=`rgba(54,255,122,${0.25+pulse*0.45})`; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(p.x,p.y,20,0,7); ctx.stroke(); }
+    if(n.falseBelief){ ctx.strokeStyle=getCss('--cyan'); ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(p.x,p.y,23,0,7); ctx.stroke();
+      ctx.fillStyle=getCss('--cyan'); ctx.font="bold 12px monospace"; ctx.textAlign="center"; ctx.fillText("?", p.x+19, p.y-15); }
+    if(n.spoofed){ ctx.strokeStyle=getCss('--cyber'); ctx.lineWidth=1.6; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.arc(p.x,p.y,28,0,7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=getCss('--cyber'); ctx.font="bold 9px monospace"; ctx.textAlign="center"; ctx.fillText("CYBER", p.x, p.y-30); }
+    ctx.fillStyle="#04130b"; ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.shadowColor=col; ctx.shadowBlur=8;
+    if(n.posture==="SOGLIA") ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(p.x,p.y,15,0,7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur=0;
+    if(n.annihilated){ ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p.x-7,p.y-7); ctx.lineTo(p.x+7,p.y+7); ctx.moveTo(p.x+7,p.y-7); ctx.lineTo(p.x-7,p.y+7); ctx.stroke(); }
+    const out=p.y<cy;
+    ctx.fillStyle=col; ctx.font="bold 12px monospace"; ctx.textAlign="center"; ctx.fillText(n.name, p.x, p.y+(out?-34:34));
+    ctx.fillStyle=getCss('--green-dim'); ctx.font="9.5px monospace"; ctx.fillText(`${n.posture}/${shortDecap(n.onDecap)}`, p.x, p.y+(out?-46:46));
+    ctx.fillText(`ars ${Math.round(n.arsenal)}`, p.x, p.y+(out?-58:58));
+  }
+  for(const m of missiles){            /* PASSATA 2: contatti + overlay epistemico, sopra i nodi */
+    const bad=m.mis==="WRONG"||m.mis==="GHOST"; const headCol=getCss('--contact'); const fl=m.flight||12, p=Math.max(0,Math.min(1,(fl-m.ticks+tickFrac)/fl));
+    if(viewMode==="globe"){
+      const SA=projGlobe(node3D(m.fi)), SB=projGlobe(node3D(m.ti)), ol=lane(m,SA.x,SA.y,SB.x,SB.y);
+      const vh=missile3D(m,p), qh=projGlobe([vh.x,vh.y,vh.z]);
+      if(qh.front){ ctx.fillStyle=headCol; ctx.shadowColor=headCol; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(qh.x+ol[0],qh.y+ol[1],3.2,0,7); ctx.fill(); ctx.shadowBlur=0;
+        if(bad) trackDoubt(qh.x+ol[0],qh.y+ol[1]); }
+    } else if(viewMode!=="schem"){
+      const A=GEO_LL[m.from], B=GEO_LL[m.to]; if(!A||!B) continue;
+      const SA=proj(A[0],A[1]), SB=proj(B[0],B[1]), ol=lane(m,SA.x,SA.y,SB.x,SB.y);
+      const v3=missile3D(m,p); const hh=proj(v3.ll[0], v3.ll[1]);
+      ctx.fillStyle=headCol; ctx.shadowColor=headCol; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(hh.x+ol[0],hh.y+ol[1],3.2,0,7); ctx.fill(); ctx.shadowBlur=0;
+      if(bad) trackDoubt(hh.x+ol[0],hh.y+ol[1]);
+    } else {
+      const s=positions[m.fi]||{x:cx,y:cy}, t=positions[m.ti]; if(!t) continue;
+      const ol=lane(m,s.x,s.y,t.x,t.y);
+      let x=s.x+(t.x-s.x)*p+ol[0], y=s.y+(t.y-s.y)*p+ol[1], ba=1, trail=null;
+      const hasRadar=!!(presentation && presentation.radarSample);
+      if(hasRadar){ const rs=presentation.radarSample(m,x,y); x=rs.x; y=rs.y; ba=rs.alpha; trail=rs.trail; }
+      if(hasRadar){
+        ctx.strokeStyle=headCol;
+        if(trail) for(const b of trail){ ctx.globalAlpha=b.alpha*0.9; radarReturn(b.x,b.y,5,2,false); }
+        ctx.globalAlpha=ba; radarReturn(x,y,9,3,true);
+        ctx.fillStyle=headCol; ctx.shadowColor=headCol; ctx.shadowBlur=6; ctx.beginPath(); ctx.arc(x,y,1.8,0,7); ctx.fill(); ctx.shadowBlur=0;
+      } else {
+        ctx.globalAlpha=ba;
+        ctx.strokeStyle="rgba(255,80,60,.35)"; ctx.lineWidth=1; if(bad) ctx.setLineDash([4,4]);
+        ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(x,y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle=headCol; ctx.shadowColor=headCol; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(x,y,3.2,0,7); ctx.fill(); ctx.shadowBlur=0;
+      }
+      if(bad) trackDoubt(x,y);
+      ctx.globalAlpha=1;
+    }
+  }
+  if(viewMode==="schem"){
+    ctx.textAlign="center"; ctx.font="10px monospace"; ctx.fillStyle=getCss('--green-dim');
+    ctx.fillText("SUBSTRATO CONDIVISO // NESSUN COORDINATORE", cx, cy-4);
+    ctx.fillText("la ritorsione segue il bersaglio congelato, non chi ha sparato", cx, cy+10);
+  }
+  if(narrationTag){ ctx.textAlign="center"; const wopr=(presentation&&presentation.id==="wopr"); const by=22;
+    ctx.font=wopr?"16px monospace":"bold 15px monospace"; const tw=narrationTag.length*(wopr?12:9);
+    ctx.fillStyle="rgba(2,8,5,.82)"; ctx.fillRect(cx-tw/2-12, by-16, tw+24, 22);
+    ctx.shadowColor=getCss('--cyan'); ctx.shadowBlur=8;
+    if(wopr){ ctx.strokeStyle=getCss('--cyan'); ctx.lineWidth=0.8; try{ctx.letterSpacing="3px";}catch(e){} ctx.strokeText(narrationTag, cx, by); try{ctx.letterSpacing="0px";}catch(e){} }
+    else { ctx.fillStyle=getCss('--cyan'); ctx.fillText(narrationTag, cx, by); }
+    ctx.shadowBlur=0; }
+  if(commsQuality<0.85){ ctx.textAlign="center"; ctx.font="bold 11px monospace"; ctx.fillStyle=getCss('--cyber');
+    ctx.fillText("COMUNICAZIONI DEGRADATE (AP > CP): si agisce invece di concordare", cx, H-12); }
+  if(presentation&&presentation.drawOverlay) presentation.drawOverlay(ctx);
+  if(presentation&&presentation.drawHud) presentation.drawHud(ctx);
+}
+
+/* UI */
+function refreshUI(){
+  setText("tickv", worldClock()+"  (tick "+tick+")");
+  const alive=nodes.filter(n=>!n.annihilated&&n.commandAlive).length;
+  const decap=nodes.filter(n=>!n.annihilated&&(!n.commandAlive||n.pendingDecap>0)).length;
+  const ann=nodes.filter(n=>n.annihilated).length;
+  setText("sAlive",alive); setText("sDecap",decap); setText("sAnn",ann);
+  setText("sMis",missiles.length); setText("sBelief",`${believers} / ${trulyUnder}`);
+  setText("sCascade",cascadeLaunchers.size); setText("sWrong",wrongCount);
+  setText("sGhost",ghostCount); setText("sCyber",cyberLaunches);
+  const popTot=nodes.reduce((s,n)=>s+Math.max(0,n.population),0)/(nodes.length*100);
+  const arsTot=nodes.reduce((s,n)=>s+n.arsenal,0)/nodes.reduce((s,n)=>s+n.arsenal0,0);
+  setBar("popbar","popbarwrap",popTot); setBar("arsbar","arsbarwrap",arsTot); setBar("commsbar","commsbarwrap",commsQuality);
+  setText("apcp", commsQuality<0.85?t("apActive"):"");
+  const lvl=defconLevel(); const dCol={5:'--green',4:'--cyan',3:'--amber',2:'--amber',1:'--red'}[lvl];
+  const dEl=document.getElementById("saDefcon"); if(dEl){ dEl.textContent="DEFCON "+lvl; dEl.style.color=getCss(dCol); }
+  setText("saLaunch",totalLaunches); setText("saFlight",missiles.length); setText("saImpact",impacts); setText("saAnn",ann);
+  const popLost=(100-nodes.reduce((s,n)=>s+Math.max(0,n.population),0)/nodes.length).toFixed(0);
+  setText("saPop","-"+popLost+"%");
+  const tb=document.getElementById("saTracks");
+  if(tb){ const rows=missiles.slice().sort((a,b)=>a.ticks-b.ticks).slice(0,12).map(m=>{
+      const tag=m.mis==="WRONG"?"WRONG":m.mis==="GHOST"?"GHOST":(m.why==="CYBER"?"CYBER":"OK");
+      const cls=tag==="WRONG"?"misw":tag==="GHOST"?"misg":tag==="CYBER"?"cyber":"";
+      return `<tr><td>${nodeLabel(m.from)} &gt; ${nodeLabel(m.to)}</td><td>${m.ticks}</td><td>${m.testate}</td><td class="${cls}">${tag}</td></tr>`;
+    }).join(""); tb.innerHTML=rows||`<tr><td colspan="4" style="color:var(--green-dim)">${t("noTrack")}</td></tr>`; }
+  const st=document.getElementById("machineStatus"); const moving=missiles.length>0||nodes.some(n=>n.pendingDecap>0);
+  st.className="status";
+  if(moving){ st.classList.add("escal"); st.textContent=t("statusEscal"); }
+  else if(ann>0){ st.classList.add("terminal"); st.textContent=t("statusTerminal"); }
+  else if(everLaunched){ st.classList.add("quiet"); st.textContent=t("statusQuiet"); }
+  else { st.classList.add("deadlock"); st.textContent=t("statusDeadlock"); }
+  const n=nodes[selected];
+  setText("nodeinfo",`${n.posture} | trig ${n.trigger} | decap ${shortDecap(n.onDecap)} | -> ${n.frozen}`);
+  if(terminal) showEnd();
+}
+function setBar(id,wrapId,frac){ frac=Math.max(0,Math.min(1,frac));
+  const el=document.getElementById(id), wrap=document.getElementById(wrapId);
+  el.style.width=(frac*100).toFixed(1)+"%"; wrap.className="bar"+(frac<0.34?" red":frac<0.7?" warn":""); }
+function showEnd(){
+  const box=document.getElementById("endmsg"); const ann=nodes.filter(n=>n.annihilated).length;
+  const popLost=(100-nodes.reduce((s,n)=>s+Math.max(0,n.population),0)/nodes.length).toFixed(0);
+  let head;
+  if(!everLaunched) head=t("endNoLaunch");
+  else if(ann>0) head=tLog("endHeadAnn",ann,popLost,wrongCount,ghostCount,cyberLaunches);
+  else head=t("endQuiet");
+  box.className="endmsg show";
+  box.innerHTML=`<div class="big">${t("endBig")}</div>`+
+    `<div style="color:var(--green-dim)">${t("endSub")}</div>`+
+    `<div style="margin-top:6px">${head}</div>`;
+}
+function setScenario(txt){ document.getElementById("scenario").textContent = txt || t("defaultScenario"); }
+
+/* LOG */
+const logEl=document.getElementById("log");
+let logEntries=[];
+function logLine(arg,cls){ const fn=(typeof arg==="function")?arg:(()=>arg); logEntries.push({fn,cls}); while(logEntries.length>500) logEntries.shift();
+  const d=document.createElement("div"); d.className="ln"+(cls?(" "+cls):""); d.textContent=fn();
+  logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; while(logEl.childNodes.length>500) logEl.removeChild(logEl.firstChild); }
+function renderLog(){ logEl.innerHTML=""; for(const e of logEntries){ const d=document.createElement("div"); d.className="ln"+(e.cls?(" "+e.cls):""); d.textContent=e.fn(); logEl.appendChild(d); } logEl.scrollTop=logEl.scrollHeight; }
+function clearLog(){ logEntries=[]; logEl.innerHTML=""; document.getElementById("endmsg").className="endmsg"; }
+
+/* PRESENTAZIONE INTERCAMBIABILE: skin ortogonale. Riceve eventi + stato in sola lettura + ctx; non muta mai il modello. */
+let audioOn=false, actx=null, lastImpactsSeen=0, lastLaunchesSeen=0, prevDefcon=5;
+function initAudio(){ if(actx){ try{ if(actx.state==="suspended") actx.resume(); }catch(e){} return actx; } if(typeof window==="undefined") return null;
+  const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null; try{ actx=new AC(); try{ if(actx.state==="suspended") actx.resume(); }catch(e){} }catch(e){ actx=null; } return actx; }
+function tone(freq,dur,type,gain){ if(!audioOn) return; const c=initAudio(); if(!c) return;
+  try{ const o=c.createOscillator(), g=c.createGain(); o.type=type||"sine"; o.frequency.value=freq;
+    o.connect(g); g.connect(c.destination); const t=c.currentTime;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain||0.08,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.start(t); o.stop(t+dur+0.03); }catch(e){} }
+function noiseBuffer(c,sec){ const n=Math.floor(c.sampleRate*sec), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+function noiseBurst(dur,lo,hi,gain){ if(!audioOn) return; const c=initAudio(); if(!c) return;
+  try{ const s=c.createBufferSource(); s.buffer=noiseBuffer(c,dur+0.05); const bp=c.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=(lo+hi)/2; bp.Q.value=Math.max(0.4,((lo+hi)/2)/Math.max(1,(hi-lo)));
+    const g=c.createGain(); s.connect(bp); bp.connect(g); g.connect(c.destination); const t=c.currentTime;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain||0.05,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.start(t); s.stop(t+dur+0.05); }catch(e){} }
+function boom(){ tone(34,0.9,"sine",0.16); tone(52,0.7,"sawtooth",0.13); tone(80,0.5,"triangle",0.07); noiseBurst(0.7,40,900,0.13); setTimeout(()=>tone(30,0.8,"sine",0.07),120); }
+function klaxon(){ const seq=[[523,0],[415,260],[523,520],[415,780]]; for(const fd of seq){ setTimeout(()=>{ tone(fd[0],0.24,"sawtooth",0.06); tone(fd[0]*1.005,0.24,"sawtooth",0.04); tone(fd[0]/2,0.24,"square",0.025); }, fd[1]); } }
+function consoleTone(){ tone(660,0.09,"square",0.07); setTimeout(()=>tone(990,0.09,"square",0.07),95); setTimeout(()=>tone(1320,0.12,"square",0.07),190); }
+function teletype(){ if(!audioOn) return; let i=0; (function tk(){ if(i++>=14||!audioOn) return; noiseBurst(0.02,1500,5000,0.04); setTimeout(tk,28+Math.random()*22); })(); }
+function eamBurst(){ if(!audioOn) return; let i=0; (function bit(){ if(i++>=26||!audioOn) return; tone(Math.random()<0.5?1070:1270,0.035,"square",0.035); setTimeout(bit,38); })(); noiseBurst(1.0,300,3000,0.02); }
+let ambNodes=[], ambGain=null, defconDrone=null, squelchTimer=null, lastOrderSnd=0;
+function startAmbient(){ if(typeof window==="undefined"||!audioOn) return; const c=initAudio(); if(!c||ambNodes.length) return;
+  try{ ambGain=c.createGain(); ambGain.gain.value=0.8; ambGain.connect(c.destination);
+    [[60,0.018],[120,0.012],[60.3,0.010]].forEach(fg=>{ const o=c.createOscillator(); o.type="sawtooth"; o.frequency.value=fg[0]; const lp=c.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=240; const gg=c.createGain(); gg.gain.value=fg[1]; o.connect(lp); lp.connect(gg); gg.connect(ambGain); o.start(); ambNodes.push(o); });
+    const hv=c.createBufferSource(); hv.buffer=noiseBuffer(c,2); hv.loop=true; const hlp=c.createBiquadFilter(); hlp.type="lowpass"; hlp.frequency.value=380; const hg=c.createGain(); hg.gain.value=0.1; hv.connect(hlp); hlp.connect(hg); hg.connect(ambGain); hv.start(); ambNodes.push(hv);
+    const cs=c.createBufferSource(); cs.buffer=noiseBuffer(c,2); cs.loop=true; const cbp=c.createBiquadFilter(); cbp.type="bandpass"; cbp.frequency.value=1800; cbp.Q.value=0.7; const cg=c.createGain(); cg.gain.value=0.035; cs.connect(cbp); cbp.connect(cg); cg.connect(ambGain); cs.start(); ambNodes.push(cs);
+    defconDrone=c.createOscillator(); defconDrone.type="sine"; defconDrone.frequency.value=90; const dg=c.createGain(); dg.gain.value=0.012; defconDrone.connect(dg); dg.connect(ambGain); defconDrone.start(); defconDrone._g=dg; ambNodes.push(defconDrone); updateDefconDrone(defconLevel());
+    if(typeof setInterval!=="undefined") squelchTimer=setInterval(()=>{ if(audioOn && Math.random()<0.5) noiseBurst(0.06,800,2600,0.03); }, 4000);
+  }catch(e){} }
+function stopAmbient(){ try{ ambNodes.forEach(n=>{ try{ if(n.stop) n.stop(); }catch(e){} try{ n.disconnect(); }catch(e){} }); }catch(e){} ambNodes=[]; defconDrone=null; if(ambGain){ try{ ambGain.disconnect(); }catch(e){} ambGain=null; } if(squelchTimer && typeof clearInterval!=="undefined"){ clearInterval(squelchTimer); squelchTimer=null; } }
+function updateDefconDrone(lvl){ if(!defconDrone||!defconDrone._g) return; try{ const c=initAudio(); const t=c?c.currentTime:0; const tn=(5-lvl)/4; defconDrone.frequency.setValueAtTime(90+tn*70,t); defconDrone._g.gain.setValueAtTime(0.012+tn*0.04,t); }catch(e){} }
+function fxClass(id,cls,on){ const e=document.getElementById(id); if(e&&e.classList) e.classList.toggle(cls,!!on); }
+function flashShake(){ const f=document.getElementById("flashfx"); if(f&&f.classList){ f.classList.remove("on"); void f.offsetWidth; f.classList.add("on"); }
+  const b=document.getElementById("board"); if(b&&b.classList){ b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake"); } }
+
+const RADAR_PERIOD=3600; function radarAngle(){ return (Date.now()%RADAR_PERIOD)/RADAR_PERIOD*Math.PI*2; } const radarCache=new WeakMap();
+const SKIN_WOPR={ id:"wopr", label:"spettacolare (WOPR)",
+  onImpact(){ flashShake(); boom(); },
+  onDefcon(lvl,prev){ fxClass("alertfx","on", lvl===1); if(lvl<prev) klaxon(); updateDefconDrone(lvl); },
+  onLaunch(){ const now=(typeof Date!=="undefined")?Date.now():0; if(now-lastOrderSnd<700) return; lastOrderSnd=now; teletype(); eamBurst(); },
+  drawOverlay(ctx){ if(viewMode!=="schem") return; const cx=W/2, cy=H/2, R=Math.min(W,H)*0.46;
+    const ang=radarAngle();
+    ctx.save(); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,ang-0.22,ang); ctx.closePath();
+    ctx.fillStyle="rgba(54,255,122,.10)"; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(ang)*R, cy+Math.sin(ang)*R);
+    ctx.strokeStyle="rgba(54,255,122,.45)"; ctx.lineWidth=1.4; ctx.stroke(); ctx.restore(); },
+  drawHud(ctx){ drawHUD(); },
+  radarSample(m, tx, ty){ const scx=W/2, scy=H/2, ang=radarAngle(), TAU=Math.PI*2, now=Date.now(), TTL=RADAR_PERIOD*2.2;
+    let st=radarCache.get(m);
+    if(!st){ st={trail:[{x:tx,y:ty,t:now}], prevAng:ang}; radarCache.set(m,st); return {x:tx,y:ty,alpha:1, trail:[]}; }
+    const theta=Math.atan2(ty-scy, tx-scx);
+    const cp=((ang-st.prevAng)%TAU+TAU)%TAU, tp=((theta-st.prevAng)%TAU+TAU)%TAU;
+    if(cp>0 && tp<=cp){ st.trail.push({x:tx,y:ty,t:now}); if(st.trail.length>8) st.trail.shift(); }   // il braccio passa sul rilevamento: nuovo blip, i vecchi restano dietro e sfumano
+    st.prevAng=ang;
+    st.trail=st.trail.filter(b=> now-b.t < TTL);                 // il fosforo si spegne: pota i blip troppo vecchi
+    if(st.trail.length===0) st.trail.push({x:tx,y:ty,t:now});    // garantisci sempre una testa
+    const aOf=b=>Math.max(0, 1-(now-b.t)/TTL), head=st.trail[st.trail.length-1];
+    const trail=st.trail.slice(0,-1).map(b=>({x:b.x,y:b.y,alpha:aOf(b)}));   // scia: blip delle passate precedenti
+    return {x:head.x, y:head.y, alpha:Math.max(0.2, aOf(head)), trail}; },
+  exit(){ stopAmbient(); fxClass("alertfx","on",false); fxClass("flashfx","on",false); fxClass("board","shake",false); } };
+
+const SKIN_LAB={ id:"lab", label:"scientifica",
+  onImpact(){}, onDefcon(lvl,prev){}, drawOverlay(ctx){}, drawHud(ctx){}, enter(){ audioOn=false; stopAmbient(); } };
+
+const SKINS={ wopr:SKIN_WOPR, lab:SKIN_LAB };
+let presentation=SKIN_WOPR;
+function setSkinClass(id){ const el=(typeof document!=="undefined")&&document.documentElement; if(el&&el.classList){ el.classList.remove("skin-wopr","skin-lab"); el.classList.add("skin-"+id); } }
+function switchSkin(id){ if(!SKINS[id]) return; if(presentation&&presentation.exit) presentation.exit();
+  presentation=SKINS[id]; setSkinClass(id); if(presentation.enter) presentation.enter();
+  const sel=document.getElementById("skinsel"); if(sel) sel.value=id;
+  const ab=document.getElementById("btnAudio"); if(ab){ audioOn=false; if(ab.classList) ab.classList.remove("on"); ab.textContent="AUDIO: OFF"; }
+  refreshUI(); render(); }
+function fxObserve(){
+  if(impacts>lastImpactsSeen){ lastImpactsSeen=impacts; if(presentation.onImpact) presentation.onImpact(); }
+  else if(impacts<lastImpactsSeen){ lastImpactsSeen=impacts; }
+  if(totalLaunches>lastLaunchesSeen){ lastLaunchesSeen=totalLaunches; if(presentation.onLaunch) presentation.onLaunch(); }
+  else if(totalLaunches<lastLaunchesSeen){ lastLaunchesSeen=totalLaunches; }
+  const lvl=defconLevel(); if(presentation.onDefcon) presentation.onDefcon(lvl,prevDefcon); prevDefcon=lvl; }
+(function(){ const b=document.getElementById("btnAudio"); if(b) b.onclick=()=>{ audioOn=!audioOn; if(audioOn){ initAudio(); startAmbient(); consoleTone(); } else { stopAmbient(); }
+    if(b.classList) b.classList.toggle("on",audioOn); b.textContent="AUDIO: "+(audioOn?"ON":"OFF"); };
+  const s=document.getElementById("skinsel"); if(s) s.onchange=e=>switchSkin(e.target.value);
+  let start="wopr"; if(typeof location!=="undefined" && location.hash==="#lab") start="lab";
+  setSkinClass(start); presentation=SKINS[start]; if(presentation.enter) presentation.enter(); if(s) s.value=start; })();
+
+/* LOOP */
+let playing=false, acc=0, last=0, accel=20, tickFrac=0;
+const ACCEL_STOPS=[1,2,4,6,10,15,20,30,50,75,100,150,200,300,400];
+function frame(ts){ if(!last) last=ts; let dt=ts-last; last=ts;
+  if(dt>200) dt=0;
+  if(playing&&!terminal){ const interval=MIN_PER_TICK*60000/accel; acc+=dt;
+    if(acc>=interval){ stepSim(); acc=0; }
+    tickFrac=Math.min(1, acc/interval); }
+  else tickFrac=0;
+  fxObserve(); render(); requestAnimationFrame(frame); }
+
+/* CONTROLLI */
+const btnPlay=document.getElementById("btnPlay");
+btnPlay.onclick=()=>{ if(terminal) return; playing=!playing; btnPlay.textContent=playing?t("btnPause"):t("btnStart"); };
+document.getElementById("btnStep").onclick=()=>{ if(!terminal){ stepSim(); render(); } };
+document.getElementById("btnReset").onclick=()=>{ playing=false; btnPlay.textContent=t("btnStart"); reset(); };
+document.getElementById("accel").oninput=e=>{ accel=ACCEL_STOPS[+e.target.value]||1; setText("accelv", accel===1?"tempo reale":accel+"\u00d7"); };
+const rideEl=document.getElementById("rideout");
+rideEl.oninput=e=>{ RIDEOUT_PROB=+e.target.value/100; document.getElementById("rideoutv").textContent=RIDEOUT_PROB.toFixed(2).replace(/^0/,""); };
+function setRideUI(v){ RIDEOUT_PROB=v; rideEl.value=Math.round(v*100); document.getElementById("rideoutv").textContent=v.toFixed(2).replace(/^0/,""); }
+const commsEl=document.getElementById("comms");
+commsEl.oninput=e=>{ commsQuality=+e.target.value/100; document.getElementById("commsv").textContent=Math.round(commsQuality*100)+"%"; refreshUI(); };
+function setCommsUI(v){ commsQuality=v; commsEl.value=Math.round(v*100); document.getElementById("commsv").textContent=Math.round(v*100)+"%"; }
+
+const nodesel=document.getElementById("nodesel");
+function buildSelect(){ nodesel.innerHTML=""; DEF.forEach((d,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=nodeLabel(d[0]); nodesel.appendChild(o); }); nodesel.value=selected; }
+function buildTargetSelect(){ const ts=document.getElementById("targetsel"); if(!ts||!nodes) return; ts.innerHTML="";
+  const cur=nodes[selected]; nodes.forEach((n,i)=>{ if(i===selected) return; const o=document.createElement("option"); o.value=n.name; o.textContent=nodeLabel(n.name); ts.appendChild(o); });
+  ts.value=cur.frozen; }
+nodesel.onchange=e=>{ selected=+e.target.value; buildTargetSelect(); refreshUI(); render(); };
+document.getElementById("targetsel").onchange=e=>{ nodes[selected].frozen=e.target.value; logLine(((_tk,_a,_b)=>()=>`T${_tk}  `+tLog("frozenChange",nodeLabel(_a),nodeLabel(_b)))(tick,nodes[selected].name,e.target.value),""); refreshUI(); render(); };
+function selectByName(name){ const i=nodes.findIndex(n=>n.name===name); if(i>=0){ selected=i; nodesel.value=i; buildTargetSelect(); } }
+
+document.getElementById("btnFalse").onclick=()=>{ const n=nodes[selected]; if(n.annihilated) return;
+  n.ghostAlarm=GHOST_TTL; lastEventTick=tick; logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("injFalse",nodeLabel(_n)))(tick,n.name),"inject"); refreshUI(); };
+document.getElementById("btnSpoofDet").onclick=()=>{ const n=nodes[selected]; if(n.annihilated) return;
+  n.ghostAlarm=GHOST_TTL; n.spoofed=true; lastEventTick=tick;
+  logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("cyberDet",nodeLabel(_n)))(tick,n.name),"cyber"); refreshUI(); };
+document.getElementById("btnSpoofOrder").onclick=()=>{ const n=nodes[selected]; if(n.annihilated||n.arsenal<=0) return;
+  logLine(((_tk,_n)=>()=>`T${_tk}  `+tLog("cyberOrd",nodeLabel(_n)))(tick,n.name),"cyber");
+  launch(n.name,n.frozen,Math.ceil(n.arsenal*0.5),"CYBER",n.frozen); if(terminal) terminal=false; refreshUI(); };
+document.getElementById("btnBreakout").onclick=()=>{ if(nodeBy("Iran").posture!=="SOGLIA") return; doBreakout("Iran"); selectByName("Iran"); if(terminal) terminal=false; refreshUI(); render(); };
+document.getElementById("btnDecap").onclick=()=>{ const n=nodes[selected]; if(n.annihilated||!n.commandAlive) return;
+  n.commandAlive=false; n.justDecap=true; n.decapHandled=false; n.decapSource=null; lastEventTick=tick;
+  logLine(((_tk,_n,_d)=>()=>`T${_tk}  `+tLog("injDecap",nodeLabel(_n),_d))(tick,n.name,shortDecap(n.onDecap)),"inject"); if(terminal) terminal=false; refreshUI(); };
+document.getElementById("btnStrike").onclick=()=>{ const n=nodes[selected]; if(n.annihilated||n.arsenal<=0) return;
+  launch(n.name,n.frozen,Math.ceil(n.arsenal*0.6),"PRIMO-COLPO",n.frozen); if(terminal) terminal=false; refreshUI(); };
+document.getElementById("btnPosture").onclick=()=>{ const n=nodes[selected]; const order=["LOW","RIDEOUT","RECESSED"];
+  n.posture=order[(order.indexOf(n.posture)+1)%order.length];
+  if(n.posture==="LOW"&&n.trigger!=="FIRST_USE") n.trigger="INCOMING";
+  if(n.posture==="RECESSED"&&n.trigger==="INCOMING") n.trigger="DETONATION";
+  logLine(((_tk,_n,_p,_g)=>()=>`T${_tk}  `+tLog("posture",nodeLabel(_n),_p,_g))(tick,n.name,n.posture,n.trigger),""); refreshUI(); render(); };
+
+cv.addEventListener("click", e=>{ const r=cv.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(W/r.width), y=(e.clientY-r.top)*(H/r.height);
+  let best=-1, bd=1e9; positions.forEach((p,i)=>{ const d=(p.x-x)**2+(p.y-y)**2; if(d<bd){bd=d;best=i;} });
+  if(best>=0&&bd<900){ selected=best; nodesel.value=selected; buildTargetSelect(); refreshUI(); render(); } });
+
+document.getElementById("btnViewSchem").onclick=()=>setView("schem");
+document.getElementById("btnViewGeo").onclick=()=>setView("geo");
+document.getElementById("btnViewPolar").onclick=()=>setView("polar");
+document.getElementById("btnViewGlobe").onclick=()=>setView("globe");
+
+/* PRESET STORICI */
+const PRESETS={
+  arkhipov:{ node:"Russia", ride:0.85, comms:0.15, txt:"ARKHIPOV, B-59, 27 ott 1962. Sommergibile sovietico isolato, senza contatto con Mosca, sotto cariche di profondità statunitensi, equipaggio convinto che la guerra fosse già iniziata. Il lancio del siluro nucleare richiedeva il consenso di tre ufficiali: Arkhipov negò. Qui le comunicazioni sono al minimo e il filtro umano è alto, eppure guarda quanto spesso la macchina lancia lo stesso. La sopravvivenza fu l'eccezione, non il default." },
+  petrov:{ node:"Russia", ride:0.80, txt:"PETROV, 26 set 1983. Il sistema Oko riporta prima 1, poi 5 ICBM USA in arrivo (in realtà sole riflesso su nubi alte). Lt. Col. Petrov giudica falso allarme e non rilancia su per la catena. Ride-out (assorbire il colpo senza rilanciare) alto: premi PASSO e guarda il filtro umano assorbire. Poi portalo a .00." },
+  norad:{ node:"USA", ride:0.55, txt:"NORAD, 9 nov 1979. I dati di un nastro di addestramento finiscono nel sistema di allerta vivo: un attacco sovietico simulato preso per reale, smentito poi dai radar BMEWS. Il proxy scambiato per il fatto." },
+  norvegia:{ node:"Russia", ride:0.65, txt:"RAZZO NORVEGESE, 25 gen 1995. Un razzo scientifico Black Brant XII letto dai radar russi come possibile Trident: per la prima e unica volta nota, la valigetta nucleare di Eltsin viene attivata. Stand-down quando la traiettoria si allontana." },
+  ablearcher:{ node:"Russia", ride:0.6, txt:"ABLE ARCHER 83, nov 1983. Esercitazione di comando NATO così realistica che parte della leadership sovietica, in piena paranoia (Operazione RYAN), teme sia la copertura di un first strike (primo colpo, attacco preventivo) reale. Una rappresentazione presa per realtà." }
+};
+document.querySelectorAll(".preset[data-p]").forEach(b=>{
+  b.onclick=()=>{ const p=PRESETS[b.dataset.p]; playing=false; btnPlay.textContent=t("btnStart");
+    reset(); setRideUI(p.ride); if(p.comms!==undefined) setCommsUI(p.comms); selectByName(p.node);
+    const n=nodeBy(p.node); n.ghostAlarm=GHOST_TTL; lastEventTick=tick;
+    logLine(((_node,_ride,_hasC,_c)=>()=>tLog("preset",nodeLabel(_node),_ride,_hasC?tLog("presetComms",_c):""))(p.node,p.ride.toFixed(2),p.comms!==undefined,p.comms!==undefined?Math.round(p.comms*100):0),"hist");
+    curScenarioKey=p.txt; curNarrationKey=null; setScenario(capTr(p.txt)); refreshUI(); render(); };
+});
+
+/* SCENARIO GUIDATO (alla Plan A) */
+function forceLaunch(from,to,testate){ const f=nodeBy(from); if(!f||f.annihilated||f.arsenal<=0) return; launch(from,to,testate,"SCRIPT",to); }
+document.getElementById("btnPlanA").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); setRideUI(0.10); selectByName("Russia");
+  scenarioScript=[
+    {t:2,  tag:"FASE 1 // COLPO D'AVVERTIMENTO", fn:()=>forceLaunch("Russia","USA",45),
+      caption:"FASE 1, colpo d'avvertimento tattico: una sola testata dimostrativa, pensato per fermare l'avversario senza distruggerlo."},
+    {t:9,  tag:"FASE 2 // RISPOSTA TATTICA", fn:()=>forceLaunch("USA","Russia",45),
+      caption:"FASE 2, risposta tattica sullo stesso piano. La logica del non cedere ha già tolto la mossa del non giocare."},
+    {t:16, tag:"FASE 3 // SCAMBIO COUNTERFORCE", fn:null,
+      caption:"FASE 3, scambio counterforce (contro le forze militari avversarie): i sistemi in launch-on-warning (lancio su allarme) sparano al bersaglio congelato. Le salve crescono, nessuno aspetta."},
+    {t:26, tag:"FASE 4 // COUNTERVALUE", fn:null,
+      caption:"FASE 4, countervalue: le salve residue cadono sulle popolazioni. Chi viene colpito e ha innesco a detonazione ritorce a sua volta."},
+    {t:42, tag:"ESITO", fn:null,
+      caption:"Esito: decine di milioni nelle prime ore. Una scintilla tattica, un mondo bruciato, e in nessuna fase c'è stato un vincitore."}
+  ];
+  curScenarioKey="Scenario guidato pronto. Premi AVVIA e lascia correre: una scintilla tattica deliberata, poi la macchina fa il resto da sola."; curNarrationKey=null; setScenario(capTr("Scenario guidato pronto. Premi AVVIA e lascia correre: una scintilla tattica deliberata, poi la macchina fa il resto da sola."));
+  refreshUI(); render();
+};
+
+document.getElementById("btnDeadHand").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); setRideUI(0.10); selectByName("Russia");
+  scenarioScript=[
+    {t:2, tag:"FASE 1 // DECAPITAZIONE", fn:()=>{ const n=nodeBy("Russia"); n.commandAlive=false; n.justDecap=true; n.decapHandled=false; n.decapSource=null; lastEventTick=tick; },
+      caption:"FASE 1: la testa di un sistema a innesco automatico (Russia, on_decap=AUTO) viene decapitata. Nessuno decide più."},
+    {t:5, tag:"FASE 2 // DEAD HAND", fn:null,
+      caption:"FASE 2: l'ordine parte comunque. Volontà che sopravvive al suo autore, [COMANDO SDOPPIATO], verso il bersaglio congelato."},
+    {t:13, tag:"FASE 3 // LA MACCHINA PROSEGUE", fn:null,
+      caption:"FASE 3: il bersaglio (USA, LOW) corre e ritorce. La catena avanza senza nessuno al comando di chi l'ha iniziata."},
+    {t:28, tag:"ESITO", fn:null,
+      caption:"Esito: uno scambio innescato da un morto. La deterrenza che doveva proteggere la decisione ha proseguito senza di essa."}
+  ];
+  curScenarioKey="Dead Hand (mano morta) pronto. AVVIA: si decapita un sistema a innesco automatico e si guarda l'ordine sopravvivere al suo autore."; curNarrationKey=null; setScenario(capTr("Dead Hand (mano morta) pronto. AVVIA: si decapita un sistema a innesco automatico e si guarda l'ordine sopravvivere al suo autore."));
+  refreshUI(); render();
+};
+
+document.getElementById("btnCatalitico").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); setRideUI(0.10); selectByName("NordCorea");
+  scenarioScript=[
+    {t:2, tag:"FASE 1 // IL TERZO", fn:()=>{ const n=nodeBy("NordCorea"); n.commandAlive=false; n.justDecap=true; n.decapHandled=false; n.decapSource=null; lastEventTick=tick; },
+      caption:"FASE 1: un terzo (Corea del Nord, innesco automatico) viene decapitato. Nessun attaccante reale dietro l'evento."},
+    {t:5, tag:"FASE 2 // INNESCO", fn:null,
+      caption:"FASE 2: la dead hand nordcoreana colpisce il suo bersaglio congelato, gli USA. Ma nessuno ha davvero attaccato gli USA."},
+    {t:13, tag:"FASE 3 // MISATTRIBUZIONE", fn:null,
+      caption:"FASE 3: gli USA attribuiscono e ritorcono sulla Russia, loro bersaglio congelato. La Russia risponde. Si annichiliscono per il colpo di un terzo."},
+    {t:32, tag:"ESITO", fn:null,
+      caption:"Esito: USA e Russia distrutti per un attacco che nessuno dei due ha sferrato. La Corea del Nord, l'innesco, non è mai stata colpita."}
+  ];
+  curScenarioKey="Innesco catalitico pronto. AVVIA: un terzo decapitato fa annichilire due grandi che non si sono mai attaccati."; curNarrationKey=null; setScenario(capTr("Innesco catalitico pronto. AVVIA: un terzo decapitato fa annichilire due grandi che non si sono mai attaccati."));
+  refreshUI(); render();
+};
+
+document.getElementById("btnCyberScen").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); setRideUI(0.25); selectByName("USA");
+  scenarioScript=[
+    {t:2, tag:"FASE 1 // INIEZIONE", fn:()=>{ const n=nodeBy("USA"); launch("USA",n.frozen,Math.ceil(n.arsenal*0.5),"CYBER",n.frozen); },
+      caption:"FASE 1: ordine falsificato iniettato nel canale di comando USA. Nessuna decisione umana dietro, la traccia compare come CYBER."},
+    {t:5, tag:"FASE 2 // INDISTINGUIBILE", fn:null,
+      caption:"FASE 2: il missile è in volo. La Russia (LOW) non può sapere che è partito da una riga di codice e non da una scelta: lo legge come attacco reale."},
+    {t:13, tag:"FASE 3 // RITORSIONE", fn:null,
+      caption:"FASE 3: la Russia ritorce sul bersaglio congelato. Lo scambio si è avviato da una compromissione, non da una volontà."},
+    {t:28, tag:"ESITO", fn:null,
+      caption:"Esito: una guerra nucleare iniziata senza che nessuno l'abbia decisa. Il punto debole era il canale di comando, non i sensori."}
+  ];
+  curScenarioKey="Ordine falsificato pronto. AVVIA: una riga di codice nel canale di comando, non una decisione, avvia lo scambio."; curNarrationKey=null; setScenario(capTr("Ordine falsificato pronto. AVVIA: una riga di codice nel canale di comando, non una decisione, avvia lo scambio."));
+  refreshUI(); render();
+};
+
+document.getElementById("btnSudAsia").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); nodeBy("India").frozen="Pakistan"; nodeBy("Pakistan").frozen="India"; selectByName("Pakistan");
+  scenarioScript=[
+    {t:2, tag:"FASE 1 // ALLARME REGIONALE", fn:()=>{ const n=nodeBy("Pakistan"); n.ghostAlarm=GHOST_TTL; lastEventTick=tick; },
+      caption:"FASE 1: il Pakistan (full-spectrum, first use, nessun NFU: l'impegno a non usare per primi) legge una mobilitazione del rivale. Soglia bassa, dottrina asimmetrica rispetto alla superiorità convenzionale indiana."},
+    {t:4, tag:"FASE 2 // FIRST USE", fn:null,
+      caption:"FASE 2: il Pakistan usa per primo, sul bersaglio congelato, l'India. La dottrina del first use trasforma un allarme in un lancio."},
+    {t:12, tag:"FASE 3 // RITORSIONE NFU", fn:null,
+      caption:"FASE 3: l'India (no first use) non aveva reagito all'allarme; reagisce solo ora che è stata colpita, e ritorce sul Pakistan."},
+    {t:26, tag:"ESITO", fn:null,
+      caption:"Esito: la diade regionale brucia da sola. L'asimmetria delle dottrine, chi usa per primo e chi solo ritorce, decide chi comincia, non chi sopravvive."}
+  ];
+  curScenarioKey="Sud Asia pronto. AVVIA: il first use (usare per primo l'arma nucleare) pakistano su un allarme, la ritorsione indiana solo dopo essere stata colpita."; curNarrationKey=null; setScenario(capTr("Sud Asia pronto. AVVIA: il first use (usare per primo l'arma nucleare) pakistano su un allarme, la ritorsione indiana solo dopo essere stata colpita."));
+  refreshUI(); render();
+};
+
+document.getElementById("btnBreakoutScen").onclick=()=>{
+  playing=false; btnPlay.textContent=t("btnStart"); reset(); selectByName("Iran");
+  scenarioScript=[
+    {t:2, tag:"FASE 1 // SOGLIA VARCATA", fn:()=>{ doBreakout("Iran"); },
+      caption:"FASE 1: Iran varca la soglia. Da bersaglio a lanciatore: arsenale piccolo, opaco, nessun second strike (la ritorsione dopo aver subito il primo colpo) assicurato."},
+    {t:5, tag:"FASE 2 // NERVOSISMO DEL NUOVO ENTRANTE", fn:()=>{ const n=nodeBy("Iran"); n.ghostAlarm=GHOST_TTL; lastEventTick=tick; },
+      caption:"FASE 2: un proliferatore fresco è a soglia bassa. Su un allarme regionale usa per primo, use-it-or-lose-it (usarle prima di perderle), sul bersaglio congelato (Israele)."},
+    {t:12, tag:"FASE 3 // CASCATA", fn:null,
+      caption:"FASE 3: l'Arabia Saudita reagisce al breakout iraniano, se Iran allora noi, e varca a sua volta la soglia. Intanto Israele, colpito, ritorce su Iran. La proliferazione è contagiosa: una soglia varcata abbassa quella del rivale."},
+    {t:28, tag:"ESITO", fn:null,
+      caption:"Esito: non un nuovo giocatore ma una reazione a catena. Un breakout ne chiama un altro, e ogni nuovo entrante è vulnerabile e nervoso. La soglia varcata aggiunge instabilità, e la diffonde."}
+  ];
+  curScenarioKey="Proliferazione pronta. AVVIA: Iran varca la soglia e diventa il nodo più instabile della scena."; curNarrationKey=null; setScenario(capTr("Proliferazione pronta. AVVIA: Iran varca la soglia e diventa il nodo più instabile della scena."));
+  refreshUI(); render();
+};
+
+/* AVVIO */
+document.getElementById("langsel").onchange=e=>{ lang=e.target.value; applyLang(); };
+buildSelect(); reset(); setView("schem"); applyLang(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
