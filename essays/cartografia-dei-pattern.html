@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0e14">
+<title>Cartografia dei pattern, non inventario | PALEOTRON</title>
+<meta name="description" content="Tre cataloghi di pattern (GoF, POSA, EIP) come mappa a scale diverse, i princìpi come asse ortogonale, e la tesi che il valore sta nell&#x27;esclusione motivata.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paleotron">
+<meta property="og:title" content="Cartografia dei pattern, non inventario | PALEOTRON">
+<meta property="og:description" content="Tre cataloghi di pattern (GoF, POSA, EIP) come mappa a scale diverse, i princìpi come asse ortogonale, e la tesi che il valore sta nell&#x27;esclusione motivata.">
+<meta property="og:url" content="https://paleotron.org/essays/cartografia-dei-pattern.html">
+<meta property="og:image" content="https://paleotron.org/assets/img/og-v2.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cartografia dei pattern, non inventario | PALEOTRON">
+<meta name="twitter:description" content="Tre cataloghi di pattern (GoF, POSA, EIP) come mappa a scale diverse, i princìpi come asse ortogonale, e la tesi che il valore sta nell&#x27;esclusione motivata.">
+<meta name="twitter:image" content="https://paleotron.org/assets/img/og-v2.png">
+<link rel="canonical" href="https://paleotron.org/essays/cartografia-dei-pattern.html">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/atom+xml" title="PALEOTRON essays" href="https://paleotron.org/feed.xml">
+<link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="/"><span class="brand-mark">PALEOTRON</span><span class="brand-sub">Playground</span></a>
+  <nav class="nav" aria-label="Primary">
+      <a href="/">Home</a>
+      <a href="/bio.html">Bio</a>
+      <a href="/playground/">Playground</a>
+      <a class="active" aria-current="page" href="/essays/">Essays</a>
+      <a href="/photos.html">Photos</a>
+      <a href="/links.html">Links</a>
+  </nav>
+</header>
+<main id="main">
+<article class="page essay">
+  <p class="eyebrow"><a href="/essays/">Essays</a> / Craft</p>
+  <h1 class="page-title">Cartografia dei pattern, non inventario</h1>
+  <p class="essay-byline"><span class="date">22 dicembre 2024</span> &middot; Roberto Russo &middot; <span class="lang">IT</span></p>
+  <div class="prose"><blockquote>
+<p>Complexity is the single major difficulty in the successful development of large-scale software systems.</p>
+<p>– Ben Moseley, Peter Marks, <a href="https://curtclifton.net/papers/MoseleyMarks06a.pdf"><em>Out of the Tar Pit</em></a> (2006)</p>
+</blockquote>
+<h2 id="la-patternite">La patternite</h2>
+<p>Il modo più comune di leggere un catalogo di pattern è anche il più dannoso: come un inventario da cui attingere. Visto così, il catalogo si riduce a uno scaffale di soluzioni pronte, e più pattern si incastrano nel codice, più il lavoro sembra riuscito. Il risultato è la <em>patternite</em>: classi che indossano il nome di un pattern come un distintivo e livelli di indirezione introdotti per esibizione, con la complessità accidentale che cresce a ogni &ldquo;applicazione&rdquo;. Il fenomeno non è d&rsquo;annata: ha solo cambiato abito, dall&rsquo;architettura pulita presa a culto al microservizio che &ldquo;deve&rdquo; avere CQRS ed Event Sourcing, fino al codice generato dai LLM, che infila Factory e Strategy dove nessuno le ha chieste. I cataloghi stessi mettono in guardia da questo: la Gang of Four lega ogni pattern a un problema <em>in un contesto</em>, con sezioni dedicate ad applicabilità e conseguenze, e un pattern definito dal suo contesto non si applica ovunque; ma è l&rsquo;avvertenza meno letta del libro.</p>
+<p>Costruire software è un&rsquo;attività economica: per ogni problema si cerca il compromesso più adeguato agli scopi, e ogni pattern introdotto è un costo che entra nel bilancio solo se rende. Da qui la tesi: un catalogo di pattern non è una cassetta degli attrezzi da cui massimizzare il prelievo, ma una mappa; e saper escludere un pattern con cognizione pesa più che saperlo applicare. Escludere non è purismo, è economia: non si paga ciò che non serve allo scopo.</p>
+<h2 id="tre-altitudini-sullo-stesso-terreno">Tre altitudini sullo stesso terreno</h2>
+<p>I tre cataloghi storici non sono in competizione né in successione, ma tre altitudini diverse sopra lo stesso terreno, e ciascuno inquadra il problema della costruzione del software a una scala diversa. Non sono la mappa intera: altri cataloghi, dai pattern d&rsquo;impresa a quelli dei microservizi, si collocano sulle stesse quote; questi tre bastano perché sono quelli che hanno reso canonica la stratificazione per scala.</p>
+<p>Il primo, <em>Design Patterns</em> della Gang of Four (GoF), vive alla quota degli oggetti e delle loro collaborazioni dentro un processo. La sua granularità è la classe, il metodo, il piccolo grafo di oggetti che si scambiano messaggi sincroni nello stesso spazio di indirizzamento. Strategy, Decorator, Observer, Composite, Visitor: tutti presuppongono riferimenti condivisi, chiamate dirette, un&rsquo;unica memoria; è la quota della struttura <em>interna</em> di un componente.</p>
+<p>Il secondo, <em>Pattern-Oriented Software Architecture</em> (POSA) di Buschmann e colleghi, sale di quota e guarda la forma grossa del sistema e dei suoi componenti a runtime. La granularità diventa il sottosistema, lo strato, il processo, lo scheletro. Layers, Pipes and Filters, Broker, Microkernel descrivono come si organizza il tutto, non come collaborano due oggetti. I volumi successivi della serie aggiungono concorrenza e networking (Reactor, Proactor, Acceptor-Connector), e qui sta un punto decisivo: quei pattern presuppongono concorrenza e distribuzione. Non sono pattern validi in astratto, sono soluzioni a problemi che esistono solo quando più attività procedono insieme o nodi comunicano.</p>
+<p>Il terzo, <em>Enterprise Integration Patterns</em> (EIP) di Hohpe e Woolf, sale ancora e guarda la comunicazione fra sistemi autonomi, o fra componenti disaccoppiati, attraverso messaggi. La granularità è il messaggio e il suo viaggio attraverso i confini: canali, instradatori, traduttori, aggregatori. Content-Based Router, Message Translator, Aggregator, Canonical Data Model presuppongono messaggistica asincrona e l&rsquo;integrazione di sistemi che non controlli del tutto.</p>
+<p>Ogni catalogo codifica un contesto, e quel contesto è la condizione di validità dei suoi pattern. Prova a sollevare un pattern dal terreno che presuppone: osserverai che ne conservi la forma ma ne perdi la forza. Un Aggregator EIP dentro una funzione sincrona in-process è un ciclo con un nome altisonante; un Broker POSA senza distribuzione è un&rsquo;indirezione che non serve a nulla; un Observer GoF fra due servizi separati da rete non è un Observer, ma un problema di messaggistica travestito. Un catalogo vale solo sul terreno che dà per scontato, e chi conosce i pattern ma non i loro presupposti li applica fuori scala, producendo cerimonia.</p>
+<h2 id="i-principi-non-sono-un-quarto-piano">I princìpi non sono un quarto piano</h2>
+<p>C&rsquo;è una tentazione, quando si stratificano i pattern per scala, di aggiungere un quarto piano: i princìpi orientati agli oggetti (SOLID, e in particolare Dependency Inversion) e il Design by Contract di Meyer. La tentazione va riconosciuta e respinta, perché è un errore di categoria.</p>
+<p>I princìpi non sono pattern a una quarta scala, ma un asse ortogonale. Un pattern è una soluzione ricorrente e nominata a un problema in un contesto, un&rsquo;istanza che puoi indicare nel codice; un principio non lo indichi da nessuna parte, perché è un vincolo con cui ogni soluzione deve fare i conti, a qualunque scala. Dependency Inversion non sta &ldquo;sopra&rdquo; Decorator: è una proprietà che il progetto può avere o non avere, sia che tu usi Decorator sia che non lo usi. Command-Query Separation nessuno la &ldquo;inserisce&rdquo;: attraversa ogni metodo come una disciplina. I pattern sono istanze; i princìpi sono invarianti. Che poi un principio si realizzi spesso attraverso un pattern, la Dependency Inversion attraverso una Strategy o una Abstract Factory, non confonde i due piani: il pattern resta il mezzo con cui il vincolo viene onorato.</p>
+<p>L&rsquo;immagine corretta non è dunque un palazzo a quattro piani, ma tre strati di pattern ordinati per scala, attraversati da un asse di princìpi che corre verticale per tutti. Confondere i due significa trattare i princìpi come funzionalità da &ldquo;applicare&rdquo; anziché come vincoli da rispettare, e un principio applicato come fosse un pattern smette di essere un principio: diventa cerimonia anch&rsquo;esso (l&rsquo;interfaccia introdotta &ldquo;per la DIP&rdquo; dove non c&rsquo;è alcuna inversione reale da fare).</p>
+<h2 id="lo-stesso-gesto-tre-nomi">Lo stesso gesto, tre nomi</h2>
+<p>Si prenda l&rsquo;idea di interporre, tra chi chiama e un componente, un terzo elemento trasparente che aggiunge un comportamento senza che il chiamante se ne accorga. La Gang of Four la chiama Decorator, con l&rsquo;enfasi sulla composizione di oggetti e l&rsquo;aggiunta di responsabilità; POSA la chiama Proxy o Interceptor, con l&rsquo;enfasi sull&rsquo;indirezione a runtime e sul punto di intercettazione; EIP la chiama Wire Tap quando il comportamento aggiunto è l&rsquo;osservazione del flusso di messaggi.</p>
+<p>Gli intenti divergono nei dettagli (Proxy controlla l&rsquo;accesso, Decorator aggiunge responsabilità, Wire Tap deriva una copia del traffico), e divergono anche le strutture: il Decorator e il Proxy si interpongono in linea, preservando l&rsquo;interfaccia, mentre il Wire Tap lavora fuori banda, biforcando una copia su un canale a parte. A ricorrere attraverso le tre quote non è la struttura ma il gesto, interporre un elemento trasparente che il chiamante non vede: è parallasse. Si tratta dello stesso gesto visto da tre altitudini, e ciascun vocabolario mette in primo piano ciò che conta alla sua scala: alla quota degli oggetti la composizione, a quella del sistema dove si inserisce l&rsquo;indirezione, a quella dell&rsquo;integrazione cosa succede al messaggio.</p>
+<p>Non si codifica il nome del pattern nell&rsquo;identificatore, perché il nome è relativo all&rsquo;altitudine mentre l&rsquo;artefatto è uno solo. Chiamare una classe <code>LoggingDecorator</code> la incatena al vocabolario GoF e a una sola delle tre quote. Si nomina la cosa per ciò che fa nel dominio, e si documenta il ruolo di pattern a parte, dove può convivere con i suoi sinonimi di quota.</p>
+<h2 id="la-disciplina-dellesclusione">La disciplina dell&rsquo;esclusione</h2>
+<p>Per la maggior parte dei sistemi, i cataloghi sono più grandi nelle loro parti inapplicabili che in quelle applicabili, e la cultura dei pattern si dimostra in ciò che si sa lasciare fuori; l&rsquo;eccezione sono i grandi sistemi distribuiti e concorrenti, dove molto di EIP e POSA si guadagna davvero il posto. Davanti a un problema, chi conosce il mestiere sa partizionare il catalogo in tre insiemi: i pattern che si applicano, quelli che sono già implicitamente presenti e quelli che sarebbero cerimonia. Il terzo insieme è di norma il più grande, e distinguerlo dagli altri due richiede il giudizio che l&rsquo;erudizione da sola non dà. Escludere bene non è l&rsquo;opposto del conoscere, ma il suo uso più esigente: bisogna possedere il catalogo a fondo proprio per sapere cosa lasciarne fuori, perché conoscere un pattern e dispiegarlo restano cose diverse.</p>
+<p>Gran parte di EIP è irrilevante per un progetto sincrono in-process: non c&rsquo;è messaggistica, quindi instradatori e canali e dead letter sono soluzioni a problemi che non esistono. Gran parte del secondo volume di POSA è irrilevante senza concorrenza: senza eventi concorrenti da smistare, un Reactor non reagisce a nulla. Saper vedere questa irrilevanza, e affermarla, conta più del saper elencare i pattern. L&rsquo;inclusione senza questo filtro è rumore: ogni pattern non giustificato aggiunge un&rsquo;indirezione, un nome da imparare, uno strato da attraversare al debug, complessità accidentale senza una forza che la compensi.</p>
+<p>Qui sta il rovesciamento rispetto alla lettura immediata: i cataloghi vanno letti come descrizioni, non come prescrizioni. Registrano soluzioni che sono ricorse, insieme al contesto che le ha fatte ricorrere; non comandano di andare a prenderle. Nella tradizione che risale a Christopher Alexander, una struttura si guadagna il nome di pattern solo dopo essere ricorsa in sistemi reali, non prima. Letti come prescrizioni producono over-engineering; letti come una mappa, localizzazione: ti dicono dove sei, a che quota vive il tuo problema e quali soluzioni quella quota richiede davvero.</p>
+<h2 id="riconoscere-non-e-introdurre">Riconoscere non è introdurre</h2>
+<p>Buona parte di ciò che passa per &ldquo;applicare un pattern&rdquo; è in realtà riconoscimento, dato che la struttura era già la soluzione ovvia e il nome del pattern le viene attaccato a posteriori. Questo è economico e comunicativo: aggiunge vocabolario condiviso e zero righe di codice. L&rsquo;introduzione è cosa diversa, perché cambia il codice per portare dentro un pattern e va pagata da una forza reale: un punto di variazione che varia davvero, un accoppiamento che fa male sul serio.</p>
+<p>Tre categorie da tenere separate: riconoscere ciò che c&rsquo;è già, gratis, da fare con liberalità, perché allinea il linguaggio del team al codice senza toccarlo; introdurre perché paga, giustificato, ma solo a fronte di una forza nominata, perché ogni pattern introdotto è un debito di complessità che deve fruttare; introdurre per il gusto di farlo, cerimonia, da rifiutare. Solo la categoria di mezzo è &ldquo;applicare un pattern&rdquo; nel senso costoso del termine, e ha sempre un conto da rendere: quale forza risolve. Un pattern introdotto senza una forza che lo giustifichi è una passività travestita da raffinatezza.</p>
+<h2 id="leggere-la-mappa">Leggere la mappa</h2>
+<p>I pattern sono esperienza di progetto compressa: il verbale di ciò che è ricorso, con allegato il contesto che lo ha fatto ricorrere; qui sta il loro valore, e insieme il loro limite. Chi li ha assimilati usa la mappa per localizzare l&rsquo;altitudine e il terreno del problema, poi prende solo ciò che quella posizione esige, e sa dire con precisione perché tutto il resto resta sulla mappa e fuori dal codice.</p>
+<p>La misura non è il numero di pattern che dispieghi, ma il rigore con cui giustifichi quelli che hai lasciato fuori.</p>
+<p><em>Vedi anche:</em> <a href="/essays/risorse-sviluppatore-professionale.html">Risorse per lo sviluppatore professionale</a>.</p>
+<h2 id="bibliografia">Bibliografia</h2>
+<p>Buschmann, Frank, Regine Meunier, Hans Rohnert, Peter Sommerlad, and Michael Stal. <a href="https://www.wiley.com/en-us/Pattern+Oriented+Software+Architecture,+Volume+1,+A+System+of+Patterns-p-9780471958697"><em>Pattern-Oriented Software Architecture, Volume 1: A System of Patterns</em></a>. Chichester: John Wiley &amp; Sons, 1996.</p>
+<p>Gamma, Erich, Richard Helm, Ralph Johnson, and John Vlissides. <a href="https://www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610"><em>Design Patterns: Elements of Reusable Object-Oriented Software</em></a>. Reading, MA: Addison-Wesley, 1994.</p>
+<p>Hohpe, Gregor, and Bobby Woolf. <a href="https://www.enterpriseintegrationpatterns.com/"><em>Enterprise Integration Patterns: Designing, Building, and Deploying Messaging Solutions</em></a>. Boston: Addison-Wesley, 2003.</p>
+<p>Martin, Robert C. <a href="https://www.informit.com/store/agile-software-development-principles-patterns-and-9780135974445"><em>Agile Software Development: Principles, Patterns, and Practices</em></a>. Upper Saddle River, NJ: Prentice Hall, 2002.</p>
+<p>Meyer, Bertrand. <a href="https://bertrandmeyer.com/oosc2/"><em>Object-Oriented Software Construction</em></a>. 2nd ed. Upper Saddle River, NJ: Prentice Hall, 1997.</p>
+<p>Schmidt, Douglas, Michael Stal, Hans Rohnert, and Frank Buschmann. <a href="https://www.wiley.com/en-us/Pattern+Oriented+Software+Architecture,+Volume+2,+Patterns+for+Concurrent+and+Networked+Objects-p-9781118725177"><em>Pattern-Oriented Software Architecture, Volume 2: Patterns for Concurrent and Networked Objects</em></a>. Chichester: John Wiley &amp; Sons, 2000.</p></div>
+  <p class="back"><a href="/essays/">&larr; all essays</a></p>
+</article>
+</main>
+<footer class="foot">
+  <div class="foot-name">paleotron.org</div>
+  <div class="foot-links"><a href="https://github.com/robertorussobob">GitHub</a> &middot; <a href="https://www.linkedin.com/in/robertorussobob">LinkedIn</a> &middot; <a href="https://stackoverflow.com/users/49716">Stack Overflow</a> &middot; <a href="https://www.pinterest.com/robertorussobob/">Pinterest</a></div>
+  <div class="foot-meta">&copy; 2020–2026 Roberto Russo &middot; <a href="/license.html">License</a> &middot; built static, served forever</div>
+</footer>
+<script data-goatcounter="https://paleotron.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>
