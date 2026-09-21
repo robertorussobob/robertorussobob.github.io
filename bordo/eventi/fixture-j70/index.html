@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <base href="../../" />
+    <meta name="bordo-evento" content="fixture-j70" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Tappa dimostrativa J/70" />
+    <meta property="og:description" content="J/70, Lago di Bracciano: il replay della regata, barca per barca." />
+    <meta property="og:url" content="https://paleotron.org/bordo/eventi/fixture-j70/" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0b1d2e" />
+    <title>Tappa dimostrativa J/70</title>
+    <script type="module" crossorigin src="./assets/index-BNldl97H.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DlTivaFa.css">
+  </head>
+  <body>
+    <div id="mappa"></div>
+    <div id="sponsor"></div>
+    <div id="vista-tridimensionale" class="nascosta"></div>
+    <button
+      id="alterna-vista"
+      type="button"
+      aria-pressed="false"
+      aria-label="passa alla vista in tre dimensioni"
+    >
+      3D
+    </button>
+
+    <header id="testata">
+      <div id="regata" class="scheda piccolo">
+        <span id="regata-nome"></span>
+        <span id="regata-quando"></span>
+        <select id="prove" class="nascosta" aria-label="scegli la prova"></select>
+      </div>
+      <div id="vento" class="scheda">
+        <div id="vento-freccia" aria-hidden="true">➤</div>
+        <div>
+          <div class="grande">
+            <span id="vento-nodi">--</span> <span class="unita" data-termine="nodi">nodi</span>
+          </div>
+          <div class="piccolo">
+            <span data-termine="vento">vento</span> da
+            <span id="vento-quadrante" data-termine="vento" title="">--</span>
+          </div>
+          <div id="vento-stimato" class="piccolo nascosta" data-termine="vento stimato">
+            vento stimato
+          </div>
+        </div>
+      </div>
+      <div id="contesto" class="scheda">
+        <div class="grande">
+          <span data-termine="lato">lato</span> <span id="lato-numero">-</span>/<span
+            id="lato-totale"
+            >-</span
+          >
+        </div>
+        <div class="piccolo"><span id="lato-verso" title="">-</span></div>
+      </div>
+    </header>
+
+    <div id="eventi">
+      <div id="raffica" class="scheda nascosta">
+        <div class="etichetta"><span data-termine="raffica">raffica</span> in arrivo</div>
+        <div class="banda"><div id="raffica-barra"></div></div>
+        <div class="piccolo">
+          <span id="raffica-delta">+0</span> nodi fra <span id="raffica-fra">--</span> s
+        </div>
+      </div>
+      <div id="toast-andatura" class="scheda toast nascosta"></div>
+      <div id="penalita" class="scheda toast nascosta"></div>
+      <div id="audio" class="scheda toast nascosta"></div>
+      <div id="equipaggio" class="scheda toast nascosta"></div>
+      <div id="avviso-vista" class="scheda toast nascosta" role="status"></div>
+      <div id="replay-tattico" class="scheda nascosta">
+        <div class="etichetta">
+          replay tattico a fine <span data-termine="lato">lato</span>
+          <span id="replay-tattico-lato">-</span>
+        </div>
+        <canvas id="replay-tattico-tela" width="240" height="180"></canvas>
+        <div id="replay-tattico-testo" class="piccolo"></div>
+      </div>
+    </div>
+
+    <section id="pannello" class="ripiegato">
+      <div id="selezionata">
+        <div id="selezionata-nome" class="nome"></div>
+        <div class="velocita">
+          <span id="selezionata-nodi" class="enorme">--</span>
+          <span class="unita" data-termine="nodi">nodi</span>
+          <div class="piccolo"><span id="selezionata-kmh">--</span> km/h</div>
+        </div>
+        <div class="dettagli">
+          <div><span data-termine="vmg">VMG</span> <b id="selezionata-vmg">--</b></div>
+          <div>
+            <span data-termine="andatura">andatura</span> <b id="selezionata-andatura">--</b>
+          </div>
+          <div><span data-termine="mure">mure</span> <b id="selezionata-mure">--</b></div>
+          <div><span data-termine="boa">boa</span> fra <b id="selezionata-eta">--</b></div>
+          <div>
+            <span data-termine="distacco">dal leader</span> <b id="selezionata-distacco">--</b>
+          </div>
+        </div>
+      </div>
+      <button
+        id="apri-classifica"
+        type="button"
+        aria-controls="classifica"
+        aria-expanded="false"
+        aria-label="mostra tutta la classifica"
+      >
+        tutta la classifica
+      </button>
+      <table id="classifica">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>barca</th>
+            <th><span data-termine="distacco">distacco</span></th>
+            <th><span data-termine="vantaggio virtuale">virtuale</span></th>
+            <th><span data-termine="boa">boa</span></th>
+            <th><span data-termine="nodi">nodi</span></th>
+          </tr>
+        </thead>
+        <tbody id="classifica-corpo"></tbody>
+      </table>
+    </section>
+
+    <footer id="comandi">
+      <button id="avvia" type="button" aria-label="riproduci">▶</button>
+      <input
+        id="scrubber"
+        type="range"
+        min="0"
+        max="1"
+        step="1"
+        value="0"
+        aria-label="posizione nel replay"
+      />
+      <div id="tempo">
+        <span id="ora-di-regata" title="ora sul campo di regata">--:--:--</span>
+        <span id="orologio" class="piccolo" title="tempo dalla partenza">0:00</span>
+      </div>
+      <button id="fai-clip" type="button" aria-label="registra una clip di trenta secondi da qui">
+        clip
+      </button>
+      <select id="velocita" aria-label="velocita' di riproduzione">
+        <option value="1">1×</option>
+        <option value="4">4×</option>
+        <option value="10">10×</option>
+        <option value="30">30×</option>
+      </select>
+    </footer>
+
+    <div id="glossa" class="nascosta" role="dialog" aria-modal="true">
+      <div id="glossa-scheda">
+        <div id="glossa-termine" class="nome"></div>
+        <div id="glossa-testo"></div>
+        <button id="glossa-chiudi" type="button" aria-label="chiudi la glossa">ho capito</button>
+      </div>
+    </div>
+
+    <div id="intro" class="nascosta" role="dialog" aria-modal="true" aria-labelledby="intro-titolo">
+      <div id="intro-scheda">
+        <h1 id="intro-titolo">Bordo</h1>
+        <p id="intro-regata" class="nome"></p>
+        <p>
+          Una regata vista da chi sta a riva: sei barche, un percorso a bastone sul lago di
+          Bracciano, il vento che cambia. Il replay parte quando chiudi questa scheda.
+        </p>
+        <p>
+          Tocca una barca per seguirla, una parola sottolineata per capire che cos'e', la classifica
+          per cambiare barca. I numeri velici sulla mappa spariscono quando due barche si
+          sovrappongono e restano nella scheda della barca.
+        </p>
+        <p>
+          La regata si apre sull'acqua, dietro la barca che segui: un dito gira lo sguardo, due lo
+          avvicinano o lo allontanano. Il bottone 3D scambia l'acqua con la mappa vista dall'alto, e
+          riporta indietro.
+        </p>
+        <button
+          id="intro-chiudi"
+          type="button"
+          aria-label="chiudi l'introduzione e avvia il replay"
+        >
+          inizia
+        </button>
+        <p id="nota-copyright" class="piccolo">© 2026 Roberto Russo. Tutti i diritti riservati.</p>
+      </div>
+    </div>
+
+    <div id="clip" class="scheda nascosta" role="status">
+      <span id="clip-stato">registro la clip</span>
+      <a id="clip-file" class="nascosta" download>scarica la clip</a>
+    </div>
+
+    <div id="caricamento">Bordo sta caricando la regata…</div>
+  </body>
+</html>
