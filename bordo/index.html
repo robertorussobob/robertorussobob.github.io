@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#0b1d2e" />
     <title>Bordo</title>
-    <script type="module" crossorigin src="./assets/index-BNldl97H.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DlTivaFa.css">
+    <script type="module" crossorigin src="./assets/index-Bc271VO_.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-I1OzMqM1.css">
   </head>
   <body>
     <div id="mappa"></div>
@@ -22,6 +22,9 @@
       aria-label="passa alla vista in tre dimensioni"
     >
       3D
+    </button>
+    <button id="apri-guida" type="button" aria-label="apri la guida: come si legge una regata">
+      ?
     </button>
 
     <header id="testata">
@@ -149,6 +152,18 @@
       </select>
     </footer>
 
+    <div id="guida" class="nascosta" role="dialog" aria-modal="true" aria-labelledby="guida-titolo">
+      <div id="guida-scheda">
+        <h2 id="guida-titolo"></h2>
+        <ol id="guida-indice"></ol>
+        <div id="guida-lettura" class="nascosta">
+          <p id="guida-testo"></p>
+          <button id="guida-momento" type="button">guardalo nel replay</button>
+          <button id="guida-indietro" type="button">tutte le schede</button>
+        </div>
+        <button id="guida-chiudi" type="button" aria-label="chiudi la guida">chiudi</button>
+      </div>
+    </div>
     <div id="glossa" class="nascosta" role="dialog" aria-modal="true">
       <div id="glossa-scheda">
         <div id="glossa-termine" class="nome"></div>
