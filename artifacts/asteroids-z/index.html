@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Asteroids Z</title>
+<meta name="description" content="Asteroids Z: vector-graphics Asteroids with physics-based ships. Solo waves or a two-player duel on one keyboard.">
+<style>
+  :root{ --ink:#ddd; --dim:#777; --rock:#ff7a1a; --line:#2a2a2a; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--ink);
+    font-family:"Courier New","DejaVu Sans Mono",ui-monospace,monospace;font-size:14px;line-height:1.4}
+  body{overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:16px;overflow:auto;background:rgba(0,0,0,.72)}
+  .overlay[hidden]{display:none}
+  .box{max-width:720px;width:100%;border:1px solid var(--line);padding:20px 22px;background:rgba(0,0,0,.85);
+    box-shadow:0 0 30px rgba(255,122,26,.08)}
+  h1{margin:0 0 4px;font-size:26px;letter-spacing:6px;color:var(--rock);text-shadow:0 0 10px rgba(255,122,26,.6)}
+  h2{margin:18px 0 8px;font-size:12px;letter-spacing:3px;color:var(--dim);font-weight:normal;text-transform:uppercase}
+  .tag{color:var(--dim);margin:0 0 6px}
+  .row{display:flex;flex-wrap:wrap;gap:8px}
+  button{font:inherit;color:var(--ink);background:transparent;border:1px solid #444;padding:8px 14px;
+    cursor:pointer;letter-spacing:1px;text-transform:uppercase}
+  button:hover{border-color:#999}
+  button.sel{border-color:var(--rock);color:var(--rock);box-shadow:0 0 10px rgba(255,122,26,.35)}
+  .picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .ship{text-align:left;text-transform:none;letter-spacing:0;padding:8px 10px;border-color:#333;display:block}
+  .ship.sel{border-color:var(--c);box-shadow:0 0 12px color-mix(in srgb,var(--c) 40%,transparent)}
+  .ship-name{display:block;color:var(--c);font-weight:bold;letter-spacing:1px}
+  .ship-blurb{display:block;color:var(--dim);font-size:11px;min-height:2.8em;margin:2px 0 6px}
+  .stat{display:block;font-size:11px;letter-spacing:1px;color:#aaa}
+  .stat i{display:inline-block;width:6ch;font-style:normal;color:var(--dim)}
+  .keys{color:var(--dim);font-size:12px;margin:6px 0 0}
+  .keys b{color:var(--ink);font-weight:normal}
+  .cta{margin-top:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  #start,#again{border-color:var(--rock);color:var(--rock);padding:10px 22px}
+  #hiscore{color:var(--dim)}
+  #pause{pointer-events:none;background:rgba(0,0,0,.4)}
+  #pause .box{border:0;background:none;text-align:center;font-size:22px;letter-spacing:6px;box-shadow:none}
+  #over .box{text-align:center}
+  #over-title{font-size:24px;letter-spacing:5px;margin:0 0 6px}
+  #over-sub{color:var(--dim);margin:0 0 16px}
+  /* Pulsanti touch: solo con puntatore grossolano e solo in modalita' solo. */
+  #touch{display:none;position:fixed;left:0;right:0;bottom:0;padding:0 14px 18px;justify-content:space-between;pointer-events:none}
+  @media (pointer:coarse){ body.touch-on #touch{display:flex} }
+  #touch .grp{display:flex;gap:12px;pointer-events:auto}
+  #touch button{width:64px;height:64px;border-radius:50%;font-size:22px;padding:0;background:rgba(0,0,0,.5);border-color:#555;touch-action:none}
+  #touch button.on{border-color:var(--rock);color:var(--rock)}
+  .foot{margin-top:14px;font-size:11px;color:#555}
+  .foot a{color:#777}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Asteroids Z game field"></canvas>
+
+<div id="menu" class="overlay">
+  <div class="box">
+    <h1>ASTEROIDS Z</h1>
+    <p class="tag">Newtonian space combat. Every ship is a trade-off: mass, thrust, torque, hull, recoil.</p>
+
+    <h2>Mode</h2>
+    <div class="row">
+      <button type="button" data-mode="solo">Solo waves</button>
+      <button type="button" data-mode="duel">Duel, two players</button>
+    </div>
+
+    <h2 id="pick1-label">Your ship</h2>
+    <div id="pick1" class="picker"></div>
+
+    <div id="pick2-wrap" hidden>
+      <h2>Player 2 (arrows, Enter)</h2>
+      <div id="pick2" class="picker"></div>
+    </div>
+
+    <h2>Controls</h2>
+    <p class="keys"><b>A</b>/<b>D</b> rotate, <b>W</b> thrust, <b>Space</b> fire. Player 2: <b>arrows</b> and <b>Enter</b>. <b>P</b> pauses.
+      Nothing slows you down but your own engine: turn around and burn to stop.</p>
+
+    <div class="cta">
+      <button type="button" id="start">Launch</button>
+      <span id="hiscore"></span>
+    </div>
+    <p class="foot">Vector remake (2026) of the 2019 Java/libGDX preview. Self-contained, no dependencies.
+      <a href="/playground/">Back to the playground</a></p>
+  </div>
+</div>
+
+<div id="over" class="overlay" hidden>
+  <div class="box">
+    <p id="over-title"></p>
+    <p id="over-sub"></p>
+    <div class="row" style="justify-content:center">
+      <button type="button" id="again">Again</button>
+      <button type="button" id="tomenu">Menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="overlay" hidden><div class="box">PAUSED</div></div>
+
+<div id="touch">
+  <div class="grp">
+    <button type="button" data-in="left" aria-label="Rotate left">&#9664;</button>
+    <button type="button" data-in="right" aria-label="Rotate right">&#9654;</button>
+  </div>
+  <div class="grp">
+    <button type="button" data-in="thrust" aria-label="Thrust">&#9650;</button>
+    <button type="button" data-in="fire" aria-label="Fire">&#9679;</button>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
