@@ -3,7 +3,7 @@
 // entrano in cache quando arrivano, cosi' un secondo giro sulla stessa zona non chiede rete.
 
 const CACHE = 'bordo-v1';
-const SHELL = ['./', './index.html', './regata.json'];
+const SHELL = ['./', './index.html', './regata.json', './evento.json'];
 
 self.addEventListener('install', (evento) => {
   evento.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -20,7 +20,7 @@ self.addEventListener('activate', (evento) => {
   );
 });
 
-// La shell (pagina, regata e file degli eventi) chiede prima la rete, cosi' un nuovo deploy o
+// La shell (pagina, regata, evento della demo e file degli eventi) chiede prima la rete, cosi' un nuovo deploy o
 // una prova reimportata arrivano al primo ricaricamento; i bundle con hash nel nome e le
 // tessere restano cache-first.
 const eShell = (richiesta) => {
@@ -28,6 +28,7 @@ const eShell = (richiesta) => {
   const percorso = new URL(richiesta.url).pathname;
   return (
     percorso.endsWith('/regata.json') ||
+    percorso.endsWith('/evento.json') ||
     (percorso.includes('/eventi/') && percorso.endsWith('.json'))
   );
 };
